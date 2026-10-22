@@ -1,0 +1,13 @@
+{
+    "require": {
+        "php": ">=7.1",
+        "ext-mcrypt": "*",
+        "guzzlehttp/guzzle": "^6.3",
+        "monolog/monolog": "^1.25",
+        "phpoffice/phpexcel": "^1.8",
+        "swiftmailer/swiftmailer": "^5.4",
+        "firebase/php-jwt": "^5.0",
+        "acme/internal-sdk": "^1.0"
+    },
+    "config": { "platform": { "php": "7.1.33" } }
+}

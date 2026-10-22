@@ -1,0 +1,742 @@
+<title>PHP Upgrade Audit (sample)</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: docs-style report — sticky top bar, sticky left menu (drawer on phones), one page per repo/comparison,
+   every scan version kept and selectable (latest by default). */
+:root {
+  --bg: #f6f6fa; --surface: #ffffff; --sunken: #eeeef5; --ink: #1c1d29; --muted: #5d6079; --line: #e1e2ec;
+  --accent: #4f5b93; --accent-soft: #e8eaf5;
+  --wajib: #b42318; --wajib-bg: #fef1ef; --depr: #a15c07; --depr-bg: #fff6e0; --perilaku: #1d5fc4; --perilaku-bg: #eaf3ff;
+  --info: #535872; --info-bg: #eff0f5; --ok: #0b7a4b; --ok-bg: #e7f7ee;
+  --add: #0b7a4b; --del: #b42318;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 6px;
+  --top: calc(52px + env(safe-area-inset-top, 0px));
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12131a; --surface: #1a1c26; --sunken: #20222e; --ink: #e7e8f1; --muted: #9a9db4; --line: #2c2f3f;
+  --accent: #a3acdf; --accent-soft: #262a40;
+  --wajib: #ff8a80; --wajib-bg: #3a1714; --depr: #f5b84a; --depr-bg: #35280d; --perilaku: #8cc4ff; --perilaku-bg: #132845;
+  --info: #a6aac2; --info-bg: #242735; --ok: #5fd39a; --ok-bg: #10301f; --add: #5fd39a; --del: #ff8a80; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #12131a; --surface: #1a1c26; --sunken: #20222e; --ink: #e7e8f1; --muted: #9a9db4; --line: #2c2f3f;
+  --accent: #a3acdf; --accent-soft: #262a40;
+  --wajib: #ff8a80; --wajib-bg: #3a1714; --depr: #f5b84a; --depr-bg: #35280d; --perilaku: #8cc4ff; --perilaku-bg: #132845;
+  --info: #a6aac2; --info-bg: #242735; --ok: #5fd39a; --ok-bg: #10301f; --add: #5fd39a; --del: #ff8a80; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+h2 { font-size: 22px; margin: 0; font-weight: 650; text-wrap: balance; }
+h3 { font-size: 16px; margin: 0; font-weight: 600; text-wrap: balance; }
+html { scroll-padding-top: calc(var(--top) + 16px); }
+.d-top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 30; height: 52px; display: flex; align-items: center; gap: 12px; background: var(--surface); border-bottom: 1px solid var(--line);
+  padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+.d-menu { display: none; width: 44px; height: 44px; margin-left: -10px; align-items: center; justify-content: center; border: 0; background: transparent; border-radius: var(--radius); color: var(--ink); cursor: pointer; }
+.d-menu:hover { background: var(--sunken); }
+.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.d-brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 650; font-size: 15px; white-space: nowrap; min-width: 0; }
+.d-brand span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.d-logo { width: 28px; height: 28px; border-radius: 7px; background: var(--accent); color: var(--surface); display: inline-flex; align-items: center; justify-content: center; font: 600 11px var(--font-mono); flex: none; }
+.d-spacer { flex: 1; }
+.d-ver { font: 500 12px/1 var(--font-mono); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; white-space: nowrap; }
+.d-layout { display: grid; grid-template-columns: 272px minmax(0, 1fr); max-width: 1440px; margin: 0 auto; }
+.d-side { position: sticky; top: var(--top); align-self: start; height: calc(100vh - var(--top)); overflow-y: auto; padding: 22px 12px 40px max(20px, env(safe-area-inset-left, 0px)); border-right: 1px solid var(--line); }
+.d-main { min-width: 0; padding: 36px max(40px, env(safe-area-inset-right, 0px)) 72px 48px; }
+.d-main > #pages, .d-main > footer { max-width: 1000px; }
+.d-scrim { display: none; }
+.d-grp + .d-grp { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
+.d-grp-t { display: flex; align-items: center; gap: 8px; padding: 0 10px; margin-bottom: 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
+.d-nav { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.d-nav a { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: var(--radius); color: var(--muted); font-size: 14.5px; line-height: 1.4; text-decoration: none; overflow-wrap: anywhere; }
+.d-nav a:hover { background: var(--sunken); color: var(--ink); }
+.d-nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.d-nav .dot { margin-left: auto; }
+.d-nav .cnt { font: 500 11px var(--font-mono); color: var(--muted); }
+.d-meta { margin-top: 26px; padding: 14px 10px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; display: grid; gap: 4px; }
+.d-meta b { color: var(--ink); font-weight: 500; }
+@media (max-width: 860px) {
+  .d-layout { grid-template-columns: minmax(0, 1fr); }
+  .d-menu { display: inline-flex; }
+  .d-top { gap: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .d-ver { display: none; }
+  .d-side { position: fixed; z-index: 50; top: 0; left: 0; bottom: 0; height: auto; width: min(320px, 86%); padding-top: calc(20px + env(safe-area-inset-top, 0px)); background: var(--surface);
+    border-right: 1px solid var(--line); transform: translateX(-104%); visibility: hidden; transition: transform .2s ease, visibility 0s .2s; }
+  body.nav-open .d-side { transform: none; visibility: visible; transition: transform .2s ease; }
+  body.nav-open .d-scrim { display: block; position: fixed; inset: 0; z-index: 40; background: rgb(5 9 11 / .55); }
+  .d-main { padding: 24px max(16px, env(safe-area-inset-right, 0px)) 56px max(16px, env(safe-area-inset-left, 0px)); }
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.dot.s-wajib { color: var(--wajib); } .dot.s-deprecated { color: var(--depr); } .dot.s-perilaku { color: var(--perilaku); } .dot.s-ok { color: var(--ok); } .dot.s-info { color: var(--info); }
+
+.page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; min-width: 0; }
+.page > * { min-width: 0; }
+#pages { min-width: 0; }
+.linkbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--muted); font-size: 13px; margin-bottom: -12px; }
+.linkfield { font: inherit; font-family: var(--font-mono); font-size: 12px; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); width: 100%; max-width: 560px; min-width: 0; }
+.verbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); font-size: 13.5px; }
+.verbar label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.verbar select { font: inherit; font-size: 13.5px; padding: 5px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); max-width: 100%; }
+.verbar .old { color: var(--depr); font-weight: 600; }
+.delta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; color: var(--muted); }
+.banner { border: 1px solid var(--depr); background: var(--depr-bg); color: var(--ink); border-radius: var(--radius); padding: 10px 14px; font-size: 14px; }
+section { display: grid; gap: 12px; min-width: 0; }
+.lead { color: var(--muted); max-width: 76ch; margin: 0; }
+.mono, code { font-family: var(--font-mono); font-size: 12.5px; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, tr:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; background: var(--sunken); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.s-wajib { color: var(--wajib); background: var(--wajib-bg); }
+.s-deprecated { color: var(--depr); background: var(--depr-bg); }
+.s-perilaku { color: var(--perilaku); background: var(--perilaku-bg); }
+.s-info { color: var(--info); background: var(--info-bg); }
+.s-ok { color: var(--ok); background: var(--ok-bg); }
+.dot.s-wajib, .dot.s-deprecated, .dot.s-perilaku, .dot.s-ok, .dot.s-info { background: currentColor; }
+.tag { font-size: 11.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; white-space: nowrap; display: inline-block; margin: 2px 4px 0 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+
+.page-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 16px; }
+.page-head h2 { font-size: 26px; }
+.summary { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 var(--radius) var(--radius) 0; max-width: 92ch; }
+.summary p { margin: 0; }
+.bar { display: flex; height: 10px; gap: 2px; min-width: 40px; max-width: 100%; }
+.bar .seg { border-radius: 3px; min-width: 6px; background: var(--info); }
+.bar .seg.wajib { background: var(--wajib); } .bar .seg.deprecated { background: var(--depr); } .bar .seg.perilaku { background: var(--perilaku); } .bar .seg.none { background: var(--ok); flex: 1; }
+table.dash td:nth-child(3) { min-width: 200px; width: 46%; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; display: grid; gap: 2px; }
+.stat .v { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.stat .k { font-size: 12.5px; color: var(--muted); }
+.stat.wajib .v { color: var(--wajib); } .stat.deprecated .v { color: var(--depr); } .stat.perilaku .v { color: var(--perilaku); } .stat.ok .v { color: var(--ok); }
+dl.profile { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0; font-size: 14px; }
+dl.profile dt { color: var(--muted); }
+dl.profile dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 560px) { dl.profile { grid-template-columns: 1fr; } dl.profile dt { margin-top: 6px; } }
+
+ol.steps { margin: 0; padding-left: 22px; display: grid; gap: 8px; max-width: 92ch; }
+ol.steps li::marker { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.notes { display: grid; gap: 10px; }
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; display: grid; gap: 6px; min-width: 0; }
+.note-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.note p { margin: 0; white-space: pre-line; max-width: 100ch; }
+.note .files { display: flex; flex-wrap: wrap; gap: 0; }
+.codecmp { display: grid; gap: 6px; margin-top: 4px; min-width: 0; }
+.codewhere { font-size: 12px; color: var(--accent); overflow-wrap: anywhere; }
+.codegrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 760px) { .codegrid { grid-template-columns: minmax(0, 1fr); } }
+.codecol { display: grid; gap: 4px; min-width: 0; align-content: start; }
+.codelabel { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.codelabel.before { color: var(--del); } .codelabel.after { color: var(--add); }
+pre.code { margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 1.55; background: var(--sunken); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.chip { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.chip[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); font-weight: 600; }
+.toolbar label { font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.toolbar input[type="search"] { font: inherit; font-size: 13px; padding: 5px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); min-width: 0; width: 220px; max-width: 100%; }
+tr.rule-row { cursor: pointer; }
+tr.rule-row:hover td { background: var(--sunken); }
+tr.rule-row td:first-child { white-space: nowrap; }
+.caret { display: inline-block; width: 12px; color: var(--muted); transition: transform .15s; }
+tr.rule-row[aria-expanded="true"] .caret { transform: rotate(90deg); }
+tr.detail td { background: var(--sunken); padding: 0; }
+.hits { list-style: none; margin: 0; padding: 8px 12px 12px; display: grid; gap: 6px; max-height: 420px; overflow: auto; }
+.hits li { display: grid; gap: 2px; min-width: 0; }
+.hits .loc { font-family: var(--font-mono); font-size: 12px; color: var(--accent); overflow-wrap: anywhere; }
+.hits .guard { font-size: 12px; color: var(--muted); }
+.hits code { display: block; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; }
+.more { font: inherit; font-size: 12.5px; color: var(--accent); background: none; border: 0; padding: 4px 0; cursor: pointer; text-align: left; }
+.empty { color: var(--muted); font-size: 14px; padding: 8px 0; margin: 0; }
+details.block { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+details.block > summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: 14px; }
+details.block > div { padding: 0 14px 14px; display: grid; gap: 10px; min-width: 0; }
+pre.diff { margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; overflow-x: auto; background: var(--sunken); border-radius: 4px; padding: 10px 12px; }
+pre.diff .a { color: var(--add); } pre.diff .d { color: var(--del); } pre.diff .h { color: var(--muted); }
+.sig { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
+.sig.old { color: var(--del); } .sig.new { color: var(--add); }
+.checklist { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 92ch; }
+.checklist li::marker { color: var(--accent); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; display: grid; gap: 6px; text-decoration: none; color: var(--ink); }
+.card:hover { border-color: var(--accent); }
+.card .sub { margin: 0; }
+footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); display: grid; gap: 4px; }
+@media (prefers-reduced-motion: reduce) { .caret, .d-side { transition: none !important; } }
+</style>
+
+<header class="d-top">
+  <button class="d-menu" id="menuBtn" type="button" aria-controls="sidebar" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <a class="d-brand" href="#overview"><span class="d-logo" aria-hidden="true">&lt;/&gt;</span><span>PHP Upgrade Audit (sample)</span></a>
+  <span class="d-spacer"></span>
+  <span class="d-ver" id="top-ver"></span>
+</header>
+<div class="d-scrim" id="scrim"></div>
+<div class="d-layout">
+  <aside class="d-side" id="sidebar"><nav id="nav"></nav><div class="d-meta" id="page-meta"></div></aside>
+  <main class="d-main"><div id="pages"></div><footer id="footer"></footer></main>
+</div>
+
+<script type="application/json" id="audit-data">{"title":"PHP Upgrade Audit (sample)","lang":"en","generated_at":"2026-10-22T08:31:17+00:00","url":null,"overview":null,"entities":[{"name":"legacy-app","kind":"repo","hidden":false,"versions":[{"schema":2,"name":"legacy-app","scan_id":"20261022T065017Z","target":"8.5.12","generated_at":"2026-10-22T06:50:17+00:00","php_runtime":"8.5.12","profile":{"tool":"detect","name":"legacy-app","git":null,"framework":null,"php_hints":[{"source":"composer.json require.php","value":"\u003E=7.1"},{"source":"composer.json config.platform.php","value":"7.1.33"}],"php_files":1,"php_lines":72,"minified_files":[],"third_party_dirs":[]},"scan":{"tool":"scan_code","php_runtime":"8.5.12","files_scanned":1,"files_skipped":[],"excludes":["vendor","node_modules",".git",".svn",".idea",".vscode","storage","bootstrap/cache","var/cache","cache","tmp"],"findings":[{"rule":"P82-DOLLAR-BRACE","file":"src/Legacy.php","line":15,"code":"$s = \"Hello ${name}\";"},{"rule":"P80-CURLY-OFFSET","file":"src/Legacy.php","line":16,"code":"$first = $name{0};"},{"rule":"P85-CAST-NAME","file":"src/Legacy.php","line":17,"code":"$n = (integer) \"5\";"},{"rule":"P85-BACKTICK","file":"src/Legacy.php","line":18,"code":"$out = `ls -la`;"},{"rule":"P80-SUBSTR-FALSE","file":"src/Legacy.php","line":21,"code":"if (substr($name, 10) === false) {}"},{"rule":"P82-RELATIVE-CALLABLE","file":"src/Legacy.php","line":22,"code":"$cb = 'self::helper';"},{"rule":"P82-RELATIVE-CALLABLE","file":"src/Legacy.php","line":23,"code":"$cb2 = ['parent', 'helper'];"},{"rule":"P84-USER-ERROR","file":"src/Legacy.php","line":24,"code":"trigger_error('x', E_USER_ERROR);"},{"rule":"P81-HTML-FLAGS","file":"src/Legacy.php","line":25,"code":"return htmlspecialchars($s);"},{"rule":"P85-CASE-SEMICOLON","file":"src/Legacy.php","line":47,"code":"case 1;"},{"rule":"P80-IMPLODE-REVERSED","file":"src/Legacy.php","line":52,"code":"$parts = implode(['a', 'b'], ',');"},{"rule":"P80-PARSE-STR-1ARG","file":"src/Legacy.php","line":53,"code":"parse_str('a=1');"},{"rule":"P80-REMOVED-FUNC","file":"src/Legacy.php","line":54,"code":"$r = each($arr);"},{"rule":"P85-FREE-FUNC","file":"src/Legacy.php","line":56,"code":"curl_close($ch);"},{"rule":"P84-CSV-ESCAPE","file":"src/Legacy.php","line":58,"code":"fputcsv($fp, ['a']);"},{"rule":"P82-UTF8-ENCODE","file":"src/Legacy.php","line":60,"code":"$s = utf8_encode('x');"},{"rule":"P81-DEPR-FUNC","file":"src/Legacy.php","line":61,"code":"$t = strftime('%Y');"},{"rule":"EXT-MYSQL","file":"src/Legacy.php","line":62,"code":"$c = mysql_connect('h');"},{"rule":"P82-MB-ENCODING","file":"src/Legacy.php","line":63,"code":"$enc = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');"},{"rule":"P80-PDO-ERRMODE","file":"src/Legacy.php","line":64,"code":"$pdo = new PDO('mysql:host=x');"},{"rule":"P85-PDO-DRIVER-CONST","file":"src/Legacy.php","line":65,"code":"$pdo-\u003EsetAttribute(PDO::MYSQL_ATTR_INIT_COMMAND, 'SET NAMES utf8');"},{"rule":"P85-DEPR-CONST","file":"src/Legacy.php","line":66,"code":"$fmt = DATE_RFC7231;"},{"rule":"P84-DEPR-CONST","file":"src/Legacy.php","line":67,"code":"error_reporting(E_ALL \u0026 ~E_STRICT);"},{"rule":"P80-REMOVED-INI","file":"src/Legacy.php","line":68,"code":"ini_set('track_errors', 1);"},{"rule":"P80-REMOVED-CAST","file":"src/Legacy.php","line":69,"code":"$f = (real) $n;"},{"rule":"P83-GET-CLASS-NOARG","file":"src/Legacy.php","line":70,"code":"echo get_class();"},{"rule":"P80-IS-RESOURCE","file":"src/Legacy.php","line":71,"code":"if (is_resource($ch)) {}"},{"rule":"P80-PHP4-CTOR","file":"src/Legacy.php","line":7,"code":"function Legacy()"},{"rule":"P82-DYNAMIC-PROP","file":"src/Legacy.php","line":10,"code":"$this-\u003Eundeclared = 2;"},{"rule":"P81-SERIALIZABLE","file":"src/Legacy.php","line":31,"code":"class Collection implements ArrayAccess, Countable, Serializable"},{"rule":"P81-RETURN-TYPE","file":"src/Legacy.php","line":33,"code":"public function offsetExists($o) { return true; }"},{"rule":"P81-RETURN-TYPE","file":"src/Legacy.php","line":34,"code":"public function offsetGet($o) { return null; }"},{"rule":"P85-SLEEP-WAKEUP","file":"src/Legacy.php","line":41,"code":"public function __sleep() { return []; }"},{"rule":"P80-AUTOLOAD-FUNC","file":"src/Legacy.php","line":44,"code":"function __autoload($c) {}"},{"rule":"P84-OPTIONAL-BEFORE-REQUIRED","file":"src/Legacy.php","line":13,"code":"public function render($name, $opt = [], $required)"},{"rule":"P84-IMPLICIT-NULLABLE","file":"src/Legacy.php","line":28,"code":"public function typed(string $x = null, int $y = 1) {}"},{"rule":"P80-CONCAT-PRECEDENCE","file":"src/Legacy.php","line":19,"code":"echo \"Total: \" . $n + 1;"},{"rule":"P80-LOOSE-CMP","file":"src/Legacy.php","line":20,"code":"if ($name == 0) {}"}],"rules":{"EXT-MYSQL":{"sev":"wajib","ver":"7.0","conf":"tinggi","title":"mysql_* extension has been removed","fix":"Use PDO or mysqli.","ref":"https://www.php.net/manual/en/migration70.removed-exts-sapis.php"},"EXT-EREG":{"sev":"wajib","ver":"7.0","conf":"tinggi","title":"ereg / POSIX regex functions have been removed","fix":"Use preg_match / preg_replace / preg_split / explode.","ref":"https://www.php.net/manual/en/migration70.removed-exts-sapis.php"},"EXT-MCRYPT":{"sev":"wajib","ver":"7.2","conf":"tinggi","title":"mcrypt extension was removed from core (moved to PECL)","fix":"Use openssl_encrypt/openssl_decrypt or sodium_*. Make sure existing data can still be decrypted (mode and padding).","ref":"https://www.php.net/manual/en/migration71.deprecated.php"},"EXT-74-REMOVED":{"sev":"wajib","ver":"7.4","conf":"tinggi","title":"wddx / recode / interbase extensions were removed from core","fix":"Use JSON/serialize, iconv/mbstring, or PDO_Firebird.","ref":"https://www.php.net/manual/en/migration74.removed-extensions.php"},"P80-REMOVED-FUNC":{"rector":"ReplaceEachAssignmentWithKeyCurrentRector","sev":"wajib","ver":"8.0","conf":"tinggi","title":"Function removed in PHP 8.0 (Call to undefined function)","fix":"each() -\u003E foreach; create_function() -\u003E function(){}; is_real() -\u003E is_float(); get_magic_quotes_*() -\u003E remove (always false); money_format() -\u003E NumberFormatter; fgetss() -\u003E fgets() + strip_tags().","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-DEFINE-CI":{"sev":"wajib","ver":"8.0","conf":"sedang","title":"define() with a 3rd argument (case-insensitive constant) is no longer supported","fix":"Remove the 3rd argument and make sure every use of the constant has exactly the same case.","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-PARSE-STR-1ARG":{"sev":"wajib","ver":"8.0","conf":"tinggi","title":"parse_str() without a result argument was removed (ArgumentCountError)","fix":"parse_str($str, $result); then use $result[...].","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-CRYPT-NOSALT":{"sev":"wajib","ver":"8.0","conf":"tinggi","title":"crypt() without a salt is no longer allowed (ArgumentCountError)","fix":"For passwords use password_hash()/password_verify().","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-MKTIME-NOARG":{"sev":"wajib","ver":"8.0","conf":"tinggi","title":"mktime()/gmmktime() require at least one argument","fix":"Use time().","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-IMPLODE-REVERSED":{"rector":"ConsistentImplodeRector","sev":"wajib","ver":"8.0","conf":"sedang","title":"implode($array, $glue) with reversed arguments was removed (TypeError)","fix":"Swap them: implode($glue, $array).","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-AUTOLOAD-FUNC":{"sev":"wajib","ver":"8.0","conf":"tinggi","title":"The __autoload() function is no longer called","fix":"Register it with spl_autoload_register() or use the Composer autoloader.","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-PHP4-CTOR":{"rector":"Php4ConstructorRector","sev":"wajib","ver":"8.0","conf":"tinggi","title":"PHP 4 style constructors (method named like the class) are no longer called automatically","fix":"Rename the method to __construct(). Otherwise objects are created uninitialised, without any error.","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-CURLY-OFFSET":{"rector":"CurlyToSquareBracketArrayStringRector","sev":"wajib","ver":"8.0","conf":"tinggi","title":"Curly brace offset access $str{0} was removed (parse error)","fix":"Use $str[0].","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-REMOVED-CAST":{"sev":"wajib","ver":"8.0","conf":"tinggi","title":"(real) and (unset) casts were removed (parse error)","fix":"(real) -\u003E (float); (unset)$x -\u003E null.","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-PHP-ERRORMSG":{"sev":"wajib","ver":"8.0","conf":"tinggi","title":"$php_errormsg no longer exists (track_errors was removed)","fix":"Use error_get_last().","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-REMOVED-CONST":{"sev":"wajib","ver":"8.0","conf":"tinggi","title":"Constant removed in PHP 8.0 (Undefined constant)","fix":"FILTER_SANITIZE_MAGIC_QUOTES -\u003E FILTER_SANITIZE_ADD_SLASHES; FILTER_FLAG_*_REQUIRED -\u003E remove (FILTER_VALIDATE_URL always requires scheme and host).","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-REMOVED-INI":{"sev":"perilaku","ver":"7.1–8.1","conf":"tinggi","title":"INI directive was removed (ini_set/ini_get return false, no error)","fix":"No error, but the setting no longer applies. Remove the call and make sure logic that depends on its value is still correct.","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"EXT-OLD-DB":{"sev":"wajib","ver":"5.4/7.0","conf":"sedang","title":"mssql / sybase / (old) sqlite extensions have been removed","fix":"Use PDO (pdo_sqlsrv, pdo_dblib, pdo_sqlite) or SQLite3.","ref":"https://www.php.net/manual/en/migration70.removed-exts-sapis.php"},"P80-REFLECTION-DEPR":{"sev":"deprecated","ver":"8.0","conf":"sedang","title":"ReflectionParameter::getClass()/isArray()/isCallable() deprecated","fix":"Use ReflectionParameter::getType(). Ignore if the object is not a ReflectionParameter.","ref":"https://www.php.net/manual/en/migration80.deprecated.php"},"P80-LIBXML-ENTITY":{"sev":"deprecated","ver":"8.0","conf":"tinggi","title":"libxml_disable_entity_loader() deprecated","fix":"Remove it; libxml \u003E= 2.9 disables external entities by default.","ref":"https://www.php.net/manual/en/migration80.deprecated.php"},"P80-ZIP-PROCEDURAL":{"sev":"deprecated","ver":"8.0","conf":"tinggi","title":"Procedural Zip API deprecated","fix":"Use the ZipArchive class.","ref":"https://www.php.net/manual/en/migration80.deprecated.php"},"P80-PGSQL-ALIAS":{"sev":"deprecated","ver":"8.0","conf":"tinggi","title":"Old pg_* function aliases deprecated","fix":"Use the new names, e.g. pg_num_rows(), pg_fetch_result(), pg_last_error().","ref":"https://www.php.net/manual/en/migration80.deprecated.php"},"P80-ENCHANT":{"sev":"deprecated","ver":"8.0","conf":"tinggi","title":"Old enchant functions deprecated","fix":"See the replacements in the migration guide.","ref":"https://www.php.net/manual/en/migration80.deprecated.php"},"P80-CONCAT-PRECEDENCE":{"sev":"perilaku","ver":"8.0","conf":"tinggi","title":"Precedence of \".\" vs \"+\"/\"-\" changed","fix":"\"Total: \" . $a + $b used to be (\"Total: \" . $a) + $b, now it is \"Total: \" . ($a + $b). Add explicit parentheses.","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-LOOSE-CMP":{"sev":"perilaku","ver":"8.0","conf":"rendah","title":"Loose comparison (==, !=, switch) with 0 or an empty string changes result","fix":"0 == \"abc\" and 0 == \"\" used to be true, now false. Check whether the variable can hold a non-numeric string; use === or an explicit cast.","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-SUBSTR-FALSE":{"sev":"perilaku","ver":"8.0","conf":"sedang","title":"substr()/mb_substr() out of range now returns \"\" instead of false","fix":"A === false check is never true anymore. Compare with === \"\" or check the length.","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-IS-RESOURCE":{"sev":"perilaku","ver":"8.0","conf":"sedang","title":"Many resources are now objects (curl, gd, xml, socket, openssl; 8.1: ftp, finfo, ldap, pgsql, imap; 8.4: dba, odbc)","fix":"is_resource($ch) is false for CurlHandle, GdImage, etc. Check !== false instead.","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-PDO-ERRMODE":{"sev":"perilaku","ver":"8.0","conf":"sedang","title":"PDO defaults to ERRMODE_EXCEPTION (8.0); MySQL/SQLite return native int/float (8.1)","fix":"Failed queries now throw PDOException instead of returning false. Fetched numbers can be int, so === \"1\" checks may fail.","ref":"https://www.php.net/manual/en/migration81.incompatible.php"},"P80-SETLOCALE":{"sev":"perilaku","ver":"8.0","conf":"rendah","title":"Default locale is always \"C\"; float to string ignores locale; strtolower etc. ignore locale (8.2)","fix":"Check number/decimal formatting and case conversion that depend on setlocale().","ref":"https://www.php.net/manual/en/migration82.incompatible.php"},"P80-ASSERT-STRING":{"sev":"perilaku","ver":"8.0","conf":"tinggi","title":"assert() with a string is no longer evaluated as code","fix":"A non-empty string always passes. Write it as an expression: assert($a \u003E 0).","ref":"https://www.php.net/manual/en/migration80.incompatible.php"},"P80-MT-SRAND":{"sev":"perilaku","ver":"7.1","conf":"rendah","title":"Seeded random sequences differ from older PHP","fix":"Re-check logic that relies on a deterministic random sequence. Never use rand()/mt_rand() for OTPs or tokens; use random_int().","ref":"https://www.php.net/manual/en/migration71.incompatible.php"},"P81-SERIALIZABLE":{"sev":"deprecated","ver":"8.1","conf":"tinggi","title":"Serializable implemented without __serialize()/__unserialize()","fix":"Add __serialize() and __unserialize().","ref":"https://www.php.net/manual/en/migration81.deprecated.php"},"P81-RETURN-TYPE":{"sev":"deprecated","ver":"8.1","conf":"tinggi","title":"Method overriding a built-in interface (ArrayAccess, Iterator, Countable, JsonSerializable, ...) has no return type","fix":"Add the matching return type (e.g. offsetGet(mixed $offset): mixed, count(): int) or #[\\ReturnTypeWillChange].","ref":"https://www.php.net/manual/en/migration81.incompatible.php"},"P81-DEPR-FUNC":{"sev":"deprecated","ver":"8.1","conf":"tinggi","title":"Function deprecated in PHP 8.1","fix":"strftime() -\u003E date() or IntlDateFormatter; mhash*() -\u003E hash*(); date_sunrise/sunset -\u003E date_sun_info().","ref":"https://www.php.net/manual/en/migration81.deprecated.php"},"P81-DEPR-CONST":{"sev":"deprecated","ver":"8.1","conf":"tinggi","title":"Constant deprecated in PHP 8.1","fix":"FILTER_SANITIZE_STRING -\u003E htmlspecialchars() on output, or FILTER_UNSAFE_RAW plus your own validation.","ref":"https://www.php.net/manual/en/migration81.deprecated.php"},"P81-PDO-FETCH-SERIALIZE":{"sev":"deprecated","ver":"8.1","conf":"tinggi","title":"PDO::FETCH_SERIALIZE deprecated","fix":"Fetch normally, then unserialize() yourself.","ref":"https://www.php.net/manual/en/migration81.deprecated.php"},"P81-HTML-FLAGS":{"sev":"perilaku","ver":"8.1","conf":"sedang","title":"Default flags of htmlspecialchars() and friends are now ENT_QUOTES | ENT_SUBSTITUTE","fix":"Single quotes are now escaped as \u0026#039;. Check output that is compared or stored, or pass the flags explicitly.","ref":"https://www.php.net/manual/en/migration81.incompatible.php"},"P81-MYSQLI-EXCEPTION":{"sev":"perilaku","ver":"8.1","conf":"sedang","title":"mysqli throws exceptions by default (MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT)","fix":"Code that checks \"if (!$result)\" is never reached because the exception is thrown first. Add try/catch or mysqli_report(MYSQLI_REPORT_OFF).","ref":"https://www.php.net/manual/en/migration81.incompatible.php"},"P81-MYSQLI-EXCEPTION-OOP":{"sev":"perilaku","ver":"8.1","conf":"sedang","title":"mysqli throws exceptions by default (MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT)","fix":"Code that checks \"if (!$result)\" is never reached because the exception is thrown first. Add try/catch or mysqli_report(MYSQLI_REPORT_OFF).","ref":"https://www.php.net/manual/en/migration81.incompatible.php"},"P82-UTF8-ENCODE":{"rector":"Utf8DecodeEncodeToMbConvertEncodingRector","sev":"deprecated","ver":"8.2","conf":"tinggi","title":"utf8_encode()/utf8_decode() deprecated","fix":"mb_convert_encoding($s, 'UTF-8', 'ISO-8859-1') and the reverse.","ref":"https://www.php.net/manual/en/migration82.deprecated.php"},"P82-DOLLAR-BRACE":{"rector":"VariableInStringInterpolationFixerRector","sev":"deprecated","ver":"8.2","conf":"tinggi","title":"String interpolation \"${var}\" deprecated","fix":"Use \"{$var}\".","ref":"https://www.php.net/manual/en/migration82.deprecated.php"},"P82-DYNAMIC-PROP":{"sev":"deprecated","ver":"8.2","conf":"sedang","title":"Possible dynamic property (undeclared property)","fix":"Declare the property in the class, or add #[\\AllowDynamicProperties]. Heuristic finding; check manually.","ref":"https://www.php.net/manual/en/migration82.deprecated.php"},"P82-RELATIVE-CALLABLE":{"sev":"deprecated","ver":"8.2","conf":"tinggi","title":"Relative callables \"self::method\" / [\"parent\", \"method\"] deprecated","fix":"Use self::class . \"::method\", [self::class, \"method\"], or the first-class callable self::method(...).","ref":"https://www.php.net/manual/en/migration82.deprecated.php"},"P82-MB-ENCODING":{"sev":"deprecated","ver":"8.2","conf":"tinggi","title":"mbstring encodings QPrint/Base64/Uuencode/HTML-ENTITIES deprecated","fix":"HTML-ENTITIES -\u003E htmlentities()/mb_encode_numericentity(); BASE64 -\u003E base64_encode(); QPrint -\u003E quoted_printable_encode().","ref":"https://www.php.net/manual/en/migration82.deprecated.php"},"P82-STR-SPLIT":{"sev":"perilaku","ver":"8.2","conf":"rendah","title":"str_split(\"\") now returns [] (used to be [\"\"])","fix":"Check code that relies on at least one element.","ref":"https://www.php.net/manual/en/migration82.incompatible.php"},"P83-GET-CLASS-NOARG":{"rector":"RemoveGetClassGetParentClassNoArgsRector","sev":"deprecated","ver":"8.3","conf":"tinggi","title":"get_class()/get_parent_class() without arguments deprecated","fix":"Use self::class / static::class / get_class($this).","ref":"https://www.php.net/manual/en/migration83.deprecated.php"},"P83-ASSERT-OPTIONS":{"sev":"deprecated","ver":"8.3","conf":"tinggi","title":"assert_options() deprecated","fix":"Configure via the zend.assertions INI setting.","ref":"https://www.php.net/manual/en/migration83.deprecated.php"},"P83-ASSERT-CONST":{"sev":"deprecated","ver":"8.3","conf":"tinggi","title":"ASSERT_* constants deprecated","fix":"Configure via the zend.assertions INI setting.","ref":"https://www.php.net/manual/en/migration83.deprecated.php"},"P84-IMPLICIT-NULLABLE":{"rector":"ExplicitNullableParamTypeRector","sev":"deprecated","ver":"8.4","conf":"tinggi","title":"Implicitly nullable parameter (Type $x = null) deprecated","fix":"Write ?Type $x = null.","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-OPTIONAL-BEFORE-REQUIRED":{"rector":"OptionalParametersAfterRequiredRector","sev":"deprecated","ver":"8.0/8.4","conf":"tinggi","title":"Optional parameter declared before a required one","fix":"The default has no effect. Remove it or reorder the parameters.","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-USER-ERROR":{"sev":"deprecated","ver":"8.4","conf":"tinggi","title":"trigger_error() with E_USER_ERROR deprecated","fix":"Throw an exception or call exit().","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-DEPR-CONST":{"sev":"deprecated","ver":"8.4","conf":"tinggi","title":"Constant deprecated in PHP 8.4","fix":"E_STRICT -\u003E remove from error_reporting (already part of E_ALL); CURLOPT_BINARYTRANSFER -\u003E remove; SID -\u003E use the session cookie.","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-DEPR-FUNC":{"sev":"deprecated","ver":"8.4","conf":"tinggi","title":"Function deprecated in PHP 8.4","fix":"lcg_value() -\u003E (new Random\\Randomizer)-\u003EgetFloat(); mysqli_kill/refresh -\u003E SQL KILL/FLUSH; mysqli_ping -\u003E remove.","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-CSV-ESCAPE":{"rector":"AddEscapeArgumentRector","sev":"deprecated","ver":"8.4","conf":"tinggi","title":"fputcsv()/fgetcsv() without an explicit $escape argument deprecated","fix":"Pass the escape argument explicitly: '\\\\' keeps today's behaviour exactly, '' (recommended by PHP) after testing your data.","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-CSV-ESCAPE-STR":{"rector":"AddEscapeArgumentRector","sev":"deprecated","ver":"8.4","conf":"tinggi","title":"str_getcsv() without an explicit $escape argument deprecated","fix":"Pass the escape argument explicitly: '\\\\' keeps today's behaviour exactly, '' (recommended by PHP) after testing your data.","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-CSV-ESCAPE-SPL":{"rector":"AddEscapeArgumentRector","sev":"deprecated","ver":"8.4","conf":"sedang","title":"SplFileObject::fgetcsv()/setCsvControl() without an explicit $escape deprecated","fix":"Pass the escape argument explicitly: '\\\\' keeps today's behaviour exactly, '' (recommended by PHP) after testing your data.","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-CSV-ESCAPE-SPL-PUT":{"rector":"AddEscapeArgumentRector","sev":"deprecated","ver":"8.4","conf":"sedang","title":"SplFileObject::fputcsv() without an explicit $escape deprecated","fix":"Pass the escape argument explicitly: '\\\\' keeps today's behaviour exactly, '' (recommended by PHP) after testing your data.","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-STREAM-CTX-OPT":{"sev":"deprecated","ver":"8.4","conf":"tinggi","title":"stream_context_set_option() with 2 arguments deprecated","fix":"Use stream_context_set_options($ctx, $options).","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-SESSION-HANDLER":{"sev":"deprecated","ver":"8.4","conf":"tinggi","title":"session_set_save_handler() with separate callbacks deprecated","fix":"Write a class implementing SessionHandlerInterface, then session_set_save_handler($handler).","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-PG-2ARG":{"sev":"deprecated","ver":"8.4","conf":"tinggi","title":"Two-argument signature of pg_fetch_result() and friends deprecated","fix":"Pass null as the row: pg_fetch_result($r, null, $field).","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"P84-LDAP-CONNECT":{"sev":"deprecated","ver":"8.3/8.4","conf":"tinggi","title":"ldap_connect() with separate host and port deprecated","fix":"Use a single URI: ldap_connect('ldap://host:389').","ref":"https://www.php.net/manual/en/migration83.deprecated.php"},"P84-SESSION-INI":{"sev":"deprecated","ver":"8.4","conf":"sedang","title":"Changing these session INI settings is deprecated","fix":"On 8.5 the deprecation fires when the value differs from the default (session.sid_length/sid_bits_per_character always). Remove the ini_set and keep the default.","ref":"https://www.php.net/manual/en/migration84.deprecated.php"},"EXT-84-PECL":{"sev":"wajib","ver":"8.4","conf":"tinggi","title":"IMAP / Pspell / OCI8 extensions were moved out of core (PECL)","fix":"Reinstall from PECL (check 8.5 support) or switch library, e.g. webklex/php-imap.","ref":"https://www.php.net/manual/en/migration84.removed-extensions.php"},"P84-MYSQLI-CONST":{"sev":"wajib","ver":"8.4","conf":"tinggi","title":"mysqli constant removed in 8.4","fix":"Remove its use.","ref":"https://www.php.net/manual/en/migration84.incompatible.php"},"P85-BACKTICK":{"rector":"ShellExecFunctionCallOverBackticksRector","sev":"deprecated","ver":"8.5","conf":"tinggi","title":"Backtick operator `cmd` deprecated","fix":"Use shell_exec() (and escapeshellarg for input).","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-CAST-NAME":{"rector":"RenameCastRector","sev":"deprecated","ver":"8.5","conf":"tinggi","title":"Non-canonical cast names deprecated","fix":"(integer) -\u003E (int), (boolean) -\u003E (bool), (double) -\u003E (float), (binary) -\u003E (string).","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-CASE-SEMICOLON":{"rector":"ColonAfterSwitchCaseRector","sev":"deprecated","ver":"8.5","conf":"tinggi","title":"case/default terminated by a semicolon deprecated","fix":"Change \"case X;\" to \"case X:\".","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-FREE-FUNC":{"rector":"RemoveFuncCallRector","sev":"deprecated","ver":"8.5","conf":"tinggi","title":"\"close/free\" functions that already had no effect are now deprecated","fix":"Remove the call; the object is freed automatically. Use unset($x) to free it earlier.","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-DEPR-FUNC":{"sev":"deprecated","ver":"8.5","conf":"tinggi","title":"Function deprecated in PHP 8.5","fix":"mysqli_execute() -\u003E mysqli_stmt_execute(); socket_set_timeout() -\u003E stream_set_timeout().","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-DIR-NOARG":{"sev":"deprecated","ver":"8.5","conf":"tinggi","title":"readdir()/rewinddir()/closedir() without a handle deprecated","fix":"Always pass the handle from opendir().","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-HTTP-RESPONSE-HEADER":{"sev":"deprecated","ver":"8.5","conf":"tinggi","title":"$http_response_header variable deprecated","fix":"Use http_get_last_response_headers().","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-DEPR-CONST":{"sev":"deprecated","ver":"8.5","conf":"tinggi","title":"Constant deprecated in PHP 8.5","fix":"DATE_RFC7231 -\u003E manual format \"D, d M Y H:i:s \\G\\M\\T\"; MHASH_* -\u003E hash() algorithm names.","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-RFC7231":{"sev":"deprecated","ver":"8.5","conf":"tinggi","title":"DateTimeInterface::RFC7231 deprecated","fix":"Manual format \"D, d M Y H:i:s \\G\\M\\T\".","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-PDO-DRIVER-CONST":{"rector":"RenameClassConstFetchRector","sev":"deprecated","ver":"8.5","conf":"tinggi","title":"Driver constants on the PDO class deprecated","fix":"PDO::MYSQL_ATTR_X -\u003E Pdo\\Mysql::ATTR_X (same for Pgsql, Sqlite, Dblib, Firebird, Odbc). Pdo\\Mysql exists since 8.4.","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-PDO-DRIVER-METHOD":{"sev":"deprecated","ver":"8.5","conf":"tinggi","title":"Driver methods on the PDO class deprecated","fix":"Use Pdo\\Pgsql / Pdo\\Sqlite (PDO::connect()) and their new methods.","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-SET-ACCESSIBLE":{"sev":"deprecated","ver":"8.5","conf":"sedang","title":"Reflection*::setAccessible() deprecated (no effect since 8.1)","fix":"Remove the call.","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-SPLOBJECTSTORAGE":{"sev":"deprecated","ver":"8.5","conf":"rendah","title":"SplObjectStorage::attach()/detach()/contains() deprecated","fix":"If the object is a SplObjectStorage: offsetSet()/offsetUnset()/offsetExists(). Ignore for other classes.","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-SLEEP-WAKEUP":{"sev":"info","ver":"8.5","conf":"tinggi","title":"__sleep()/__wakeup() soft-deprecated","fix":"No warning yet. Plan the move to __serialize()/__unserialize().","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-INI":{"sev":"deprecated","ver":"8.5","conf":"tinggi","title":"INI directive deprecated in PHP 8.5","fix":"intl.error_level -\u003E intl.use_exceptions or manual error checks.","ref":"https://www.php.net/manual/en/migration85.deprecated.php"},"P85-SIMPLEXML-XPATH":{"sev":"perilaku","ver":"8.5","conf":"rendah","title":"SimpleXMLElement::xpath() returns false (not []) when the expression is not a node set","fix":"Check the result before looping over it.","ref":"https://www.php.net/manual/en/migration85.incompatible.php"}}},"lint":{"tool":"lint","php":"8.5.12","files_linted":1,"errors":[{"type":"Parse error","file":"src/Legacy.php","line":16,"message":"syntax error, unexpected token \"{\""}],"deprecations":[]},"libs":{"tool":"check_libs","target":"8.5.12","composer":true,"root":{"php":"\u003E=7.1","allows_target":true,"platform_php":"7.1.33","has_lock":true},"packages":[{"name":"guzzlehttp/guzzle","version":"6.3.3","dev":false,"php":"\u003E=5.5","released":"2018-04-22","satisfies":true,"source":"packagist","risk":["dirilis sebelum PHP 8.0","constraint terbuka tanpa batas atas"],"suggest":{"min_same_major":{"version":"6.3.3","php":"\u003E=5.5","released":"2018-04-22"},"latest_same_major":{"version":"6.5.8","php":"\u003E=5.5","released":"2022-06-20"},"latest_compatible":{"version":"8.3.0","php":"^7.4 || ^8.0","released":"2026-10-18"},"latest":{"version":"8.3.0","php":"^7.4 || ^8.0","released":"2026-10-18"}},"abandoned":false,"status":"cek-manual"},{"name":"monolog/monolog","version":"1.25.1","dev":false,"php":"\u003E=5.3.0","released":"2019-09-06","satisfies":true,"source":"packagist","risk":["dirilis sebelum PHP 8.0","constraint terbuka tanpa batas atas"],"suggest":{"min_same_major":{"version":"1.25.1","php":"\u003E=5.3.0","released":"2019-09-06"},"latest_same_major":{"version":"1.27.1","php":"\u003E=5.3.0","released":"2022-06-09"},"latest_compatible":{"version":"3.12.1","php":"\u003E=8.1","released":"2026-09-29"},"latest":{"version":"3.12.1","php":"\u003E=8.1","released":"2026-09-29"}},"abandoned":false,"status":"cek-manual"},{"name":"phpoffice/phpexcel","version":"1.8.1","dev":false,"php":"\u003E=5.2.0","released":"2015-05-01","satisfies":true,"source":"packagist","risk":["dirilis sebelum PHP 8.0","constraint terbuka tanpa batas atas"],"suggest":{"min_same_major":{"version":"1.8.1","php":"\u003E=5.2.0","released":"2015-05-01"},"latest_same_major":{"version":"1.8.1","php":"\u003E=5.2.0","released":"2015-05-01"},"latest_compatible":{"version":"1.8.1","php":"\u003E=5.2.0","released":"2015-05-01"},"latest":{"version":"1.8.2","php":"^5.2|^7.0","released":"2018-11-22"}},"abandoned":"phpoffice/phpspreadsheet","status":"cek-manual"},{"name":"swiftmailer/swiftmailer","version":"v5.4.12","dev":false,"php":"\u003E=5.3.3","released":"2018-07-31","satisfies":true,"source":"packagist","risk":["dirilis sebelum PHP 8.0","constraint terbuka tanpa batas atas"],"suggest":{"min_same_major":{"version":"v5.4.12","php":"\u003E=5.3.3","released":"2018-07-31"},"latest_same_major":{"version":"v5.4.12","php":"\u003E=5.3.3","released":"2018-07-31"},"latest_compatible":{"version":"v6.3.0","php":"\u003E=7.0.0","released":"2021-10-18"},"latest":{"version":"v6.3.0","php":"\u003E=7.0.0","released":"2021-10-18"}},"abandoned":"symfony/mailer","status":"cek-manual"},{"name":"firebase/php-jwt","version":"v5.0.0","dev":false,"php":"\u003E=5.3.0","released":"2017-06-27","satisfies":true,"source":"packagist","risk":["dirilis sebelum PHP 8.0","constraint terbuka tanpa batas atas"],"suggest":{"min_same_major":{"version":"v5.0.0","php":"\u003E=5.3.0","released":"2017-06-27"},"latest_same_major":{"version":"v5.5.1","php":"\u003E=5.3.0","released":"2021-11-08"},"latest_compatible":{"version":"v7.2.1","php":"^8.0","released":"2026-09-28"},"latest":{"version":"v7.2.1","php":"^8.0","released":"2026-09-28"}},"abandoned":false,"status":"cek-manual"},{"name":"symfony/polyfill-mbstring","version":"v1.12.0","dev":false,"php":"\u003E=5.3.3","released":"2019-08-06","satisfies":true,"source":"packagist","risk":["dirilis sebelum PHP 8.0","constraint terbuka tanpa batas atas"],"suggest":{"min_same_major":{"version":"v1.12.0","php":"\u003E=5.3.3","released":"2019-08-06"},"latest_same_major":{"version":"v1.43.0","php":"\u003E=7.2","released":"2026-09-24"},"latest_compatible":{"version":"v1.43.0","php":"\u003E=7.2","released":"2026-09-24"},"latest":{"version":"v1.43.0","php":"\u003E=7.2","released":"2026-09-24"}},"abandoned":false,"status":"cek-manual"},{"name":"acme/internal-sdk","version":"1.2.0","dev":false,"php":"^7.0","released":"2020-01-01","satisfies":false,"source":"lain","risk":["dirilis sebelum PHP 8.0","package privat/non-Packagist: cek versi terbaru di repo internal"],"suggest":null,"status":"tidak-didukung"},{"name":"phpunit/phpunit","version":"7.5.20","dev":true,"php":"^7.1","released":"2020-01-08","satisfies":false,"source":"packagist","risk":["dirilis sebelum PHP 8.0"],"suggest":{"min_same_major":null,"latest_same_major":null,"latest_compatible":{"version":"13.4.3","php":"\u003E=8.4.1","released":"2026-10-16"},"latest":{"version":"13.4.3","php":"\u003E=8.4.1","released":"2026-10-16"}},"abandoned":false,"status":"perlu-upgrade"}],"extensions":[{"name":"mcrypt","required_by":["(root)"],"removed_in":"7.2","loaded_locally":false},{"name":"xml","required_by":["phpoffice/phpexcel"],"removed_in":null,"loaded_locally":true},{"name":"xmlwriter","required_by":["phpoffice/phpexcel"],"removed_in":null,"loaded_locally":true}],"errors":[]},"phpcompat":{"tool":"phpcompat","testVersion":"8.5","ok":true,"totals":{"errors":12,"warnings":15,"fixable":1},"messages":[{"file":"src/Legacy.php","line":13,"type":"WARNING","source":"FunctionDeclarations.RemovedOptionalBeforeRequiredParam.Deprecated80","message":"Declaring an optional parameter before a required parameter is deprecated since PHP 8.0. Parameter $opt is optional, while parameter $required is required. The $opt parameter is implicitly treated as a required parameter."},{"file":"src/Legacy.php","line":15,"type":"WARNING","source":"TextStrings.RemovedDollarBraceStringEmbeds.DeprecatedVariableSyntax","message":"Using ${var} in strings is deprecated since PHP 8.2, use {$var} instead. Found: ${name}"},{"file":"src/Legacy.php","line":16,"type":"ERROR","source":"Syntax.RemovedCurlyBraceArrayAccess.Removed","message":"Curly brace syntax for accessing array elements and string offsets has been deprecated in PHP 7.4 and removed in PHP 8.0. Found: $name{0}"},{"file":"src/Legacy.php","line":17,"type":"WARNING","source":"TypeCasts.RemovedTypeCasts.integerDeprecated","message":"The integer cast is deprecated since PHP 8.5; Use (int) instead"},{"file":"src/Legacy.php","line":18,"type":"WARNING","source":"LanguageConstructs.RemovedLanguageConstructs.t_backtickDeprecated","message":"The backtick operator is deprecated since PHP 8.5; Use shell_exec() instead"},{"file":"src/Legacy.php","line":18,"type":"WARNING","source":"LanguageConstructs.RemovedLanguageConstructs.t_backtickDeprecated","message":"The backtick operator is deprecated since PHP 8.5; Use shell_exec() instead"},{"file":"src/Legacy.php","line":19,"type":"ERROR","source":"Operators.ChangedConcatOperatorPrecedence.Found","message":"Using an unparenthesized expression containing a \".\" before a \"+\" or \"-\" has been deprecated in PHP 7.4 and removed in PHP 8.0"},{"file":"src/Legacy.php","line":24,"type":"WARNING","source":"ParameterValues.RemovedTriggerErrorLevel.Deprecated","message":"Passing E_USER_ERROR to trigger_error() is deprecated since 8.4. Throw an exception or call exit with a string message instead."},{"file":"src/Legacy.php","line":28,"type":"WARNING","source":"FunctionDeclarations.RemovedImplicitlyNullableParam.Deprecated","message":"Implicitly marking a parameter as nullable is deprecated since PHP 8.4. Update the type to be explicitly nullable instead. Found implicitly nullable parameter: $x."},{"file":"src/Legacy.php","line":31,"type":"WARNING","source":"Interfaces.RemovedSerializable.Deprecated","message":"\"Only Serializable\" classes are deprecated since PHP 8.1. The magic __serialize() and __unserialize() methods need to be implemented for cross-version compatibility. Missing implementation of: __serialize() and __unserialize()"},{"file":"src/Legacy.php","line":41,"type":"ERROR","source":"Interfaces.NewInterfaces.serializableUnsupportedMethod","message":"Classes that implement interface Serializable do not support the method __sleep(). See https://www.php.net/serializable"},{"file":"src/Legacy.php","line":44,"type":"ERROR","source":"FunctionNameRestrictions.RemovedMagicAutoload.Removed","message":"Specifying an autoloader using an __autoload() function is deprecated since PHP 7.2 and no longer supported since PHP 8.0"},{"file":"src/Legacy.php","line":52,"type":"ERROR","source":"ParameterValues.RemovedImplodeFlexibleParamOrder.Removed","message":"Passing the $glue and $pieces parameters in reverse order to implode has been deprecated since PHP 7.4 and is removed since PHP 8.0; $glue should be the first parameter and $pieces the second"},{"file":"src/Legacy.php","line":53,"type":"ERROR","source":"FunctionUse.OptionalToRequiredFunctionParameters.parse_str_resultHardRequired","message":"The \"result\" parameter for function parse_str() is missing. Passing this parameter is no longer optional. The optional nature of the parameter is deprecated since PHP 7.2 and removed since PHP 8.0"},{"file":"src/Legacy.php","line":54,"type":"ERROR","source":"FunctionUse.RemovedFunctions.eachDeprecatedRemoved","message":"Function each() is deprecated since PHP 7.2 and removed since PHP 8.0; Use a foreach loop or ArrayIterator instead"},{"file":"src/Legacy.php","line":56,"type":"WARNING","source":"FunctionUse.RemovedFunctions.curl_closeDeprecated","message":"Function curl_close() is deprecated since PHP 8.5"},{"file":"src/Legacy.php","line":58,"type":"WARNING","source":"ParameterValues.RemovedProprietaryCSVEscaping.DeprecatedParamNotPassed","message":"The $escape parameter must be passed when calling fputcsv() as its default value will change in a future PHP version."},{"file":"src/Legacy.php","line":60,"type":"WARNING","source":"FunctionUse.RemovedFunctions.utf8_encodeDeprecated","message":"Function utf8_encode() is deprecated since PHP 8.2; Use mb_convert_encoding(), UConverter::transcode() or iconv instead"},{"file":"src/Legacy.php","line":61,"type":"WARNING","source":"FunctionUse.RemovedFunctions.strftimeDeprecated","message":"Function strftime() is deprecated since PHP 8.1; Use date() or IntlDateFormatter::format() instead"},{"file":"src/Legacy.php","line":62,"type":"ERROR","source":"FunctionUse.RemovedFunctions.mysql_connectDeprecatedRemoved","message":"Function mysql_connect() is deprecated since PHP 5.5 and removed since PHP 7.0"},{"file":"src/Legacy.php","line":62,"type":"ERROR","source":"Extensions.RemovedExtensions.mysql_DeprecatedRemoved","message":"Extension 'mysql_' is deprecated since PHP 5.5 and removed since PHP 7.0; Use mysqli instead"},{"file":"src/Legacy.php","line":66,"type":"WARNING","source":"Constants.RemovedConstants.date_rfc7231Deprecated","message":"The constant \"DATE_RFC7231\" is deprecated since PHP 8.5"},{"file":"src/Legacy.php","line":67,"type":"WARNING","source":"Constants.RemovedConstants.e_strictDeprecated","message":"The constant \"E_STRICT\" is deprecated since PHP 8.4"},{"file":"src/Legacy.php","line":68,"type":"ERROR","source":"IniDirectives.RemovedIniDirectives.track_errorsDeprecatedRemoved","message":"INI directive 'track_errors' is deprecated since PHP 7.2 and removed since PHP 8.0"},{"file":"src/Legacy.php","line":69,"type":"ERROR","source":"TypeCasts.RemovedTypeCasts.realDeprecatedRemoved","message":"The real cast is deprecated since PHP 7.4 and removed since PHP 8.0; Use (float) instead"},{"file":"src/Legacy.php","line":70,"type":"WARNING","source":"ParameterValues.RemovedGetClassNoArgs.ArgMissing","message":"Calling get_class() without the $object argument is deprecated since PHP 8.3."},{"file":"src/Legacy.php","line":70,"type":"ERROR","source":"ParameterValues.ForbiddenGetClassNoArgsOutsideOO.Found","message":"Calling get_class() without an argument, from outside of an OO scope, will throw an Error since PHP 8.0."}]},"rector":{"tool":"rector","set":"UP_TO_PHP_85","ok":true,"changed_files":1,"errors":[],"by_rule":{"OptionalParametersAfterRequiredRector":1,"ConsistentImplodeRector":1,"ReplaceEachAssignmentWithKeyCurrentRector":1,"CurlyToSquareBracketArrayStringRector":1,"VariableInStringInterpolationFixerRector":1,"Utf8DecodeEncodeToMbConvertEncodingRector":1,"RemoveGetClassGetParentClassNoArgsRector":1,"AddEscapeArgumentRector":1,"ExplicitNullableParamTypeRector":1,"ShellExecFunctionCallOverBackticksRector":1,"ColonAfterSwitchCaseRector":1,"RemoveFuncCallRector":1,"RenameCastRector":1,"RenameClassConstFetchRector":1,"ExplicitPublicClassMethodRector":1}}}]}],"redacted":0}</script>
+<script>
+(function () {
+  const DATA = JSON.parse(document.getElementById('audit-data').textContent);
+  const LANG = DATA.lang === 'id' ? 'id' : 'en';
+  document.documentElement.lang = LANG;
+
+  // ---------- i18n
+  const I18N = {
+    en: {
+      menu: 'Open menu', menuLabel: 'Report menu', grpReport: 'Report', grpRepos: 'Repositories', grpCompare: 'Comparisons', overview: 'Overview',
+      target: 'Target', generated: 'Generated', runOn: 'Run on PHP', scans: 'scans', copyLink: 'Copy link to this page', copied: 'Link copied', copyManual: 'Copy it from the box',
+      sev: { wajib: ['Must fix', 'error or fatal, or code no longer runs'], deprecated: ['Deprecated', 'still runs, emits a warning, breaks in PHP 9'], perilaku: ['Behaviour change', 'no error, result can differ'], info: ['Info', 'note, not urgent'] },
+      lib: { 'aman': 'Safe', 'perlu-upgrade': 'Upgrade needed', 'tidak-didukung': 'Not supported', 'cek-manual': 'Check manually' },
+      autoStatus: { ok: 'Ready', dep: 'Needs adjustments', must: 'Not ready' },
+      version: 'Scan version', latest: 'latest', olderView: 'You are viewing an older scan.', toLatest: 'Go to latest',
+      vsPrev: 'Compared with previous scan', resolved: 'resolved', added: 'new', unchanged: 'unchanged', firstScan: 'First scan of this repo.',
+      carried: (d) => `Analyst notes were carried over from the scan of ${d} and have not been reviewed for this scan yet.`,
+      dashboard: 'Dashboard', reposAudited: 'Repositories audited', phpFiles: 'PHP files', lines: 'lines', mustItems: 'Must-fix items in repos (analyst notes)',
+      depInCode: 'Deprecations in code', behInCode: 'Behaviour changes (review)', lintErr: (t) => `php -l errors on PHP ${t}`, pkgs: 'Composer packages', pkgCheck: 'to check',
+      overrideConf: 'Override conflicts (framework merge)', mustList: 'Must fix', distribution: 'Code findings', status: 'Status', repo: 'Repository', framework: 'Framework', packages: 'Packages', lastScan: 'Last scan',
+      goal: 'Scan goal', conclusion: 'Conclusion', steps: 'Recommended steps', comparisons: 'Comparisons', perRepo: 'Per repository', crossNotes: 'Cross-repo notes',
+      perRepoLead: (t) => `Code finding counts exclude code that is guarded by a version or extension check and proven not to run on PHP ${t}. Status follows the analyst review on each page.`,
+      runtimeTitle: 'Check while the application runs', runtimeLead: (t) => `These depend on runtime values and cannot be confirmed by reading code. Run on PHP ${t} with error_reporting(E_ALL) and watch the logs.`,
+      runtime: ['<b>null passed to built-in function parameters</b> (8.1, deprecated): <code>strlen(null)</code>, <code>trim(null)</code>, <code>str_replace(..., null)</code>.', '<b>count() on values that are not arrays or Countable</b> (8.0, TypeError).', '<b>Arithmetic on non-numeric strings</b> (8.0, TypeError): <code>"abc" + 1</code>.', '<b>Reading properties or offsets of null / non-objects</b> (8.0): Warning; writing to a non-object is an Error.', '<b>Dynamic properties on subclasses</b> (8.2, deprecated): the scanner only checks classes without a parent.', '<b>Incrementing non-numeric strings</b>, <b>ord(\'\')</b>, <b>chr() outside 0-255</b> (8.3/8.5, deprecated).', '<b>Float to int casts that do not fit</b> and <b>destructuring non-arrays</b> (8.5, Warning).', '<b>Sort callbacks returning bool</b> (8.0, deprecated): use <code>&lt;=&gt;</code>.'],
+      methodTitle: 'How this audit was made',
+      method: ['<b>Code scanner</b>: PHP tokenizer with rules from the official php.net migration guides 7.1 to 8.5. Code guarded by <code>if (PHP_VERSION_ID &lt; ...)</code> or similar is evaluated against the target version.', '<b>Proof from PHP itself</b>: <code>php -l</code> with the target binary on every file, plus loading classes on the target PHP where possible.', '<b>Libraries</b>: the <code>php</code> constraint of every package in <code>composer.lock</code> is matched against the target, plus Packagist metadata. Private packages are never sent to Packagist.', '<b>Cross-checks</b>: PHPCompatibility and Rector <code>--dry-run</code>. The audited repos are never modified.', '<b>Redaction</b>: secrets in snippets, notes and code samples are replaced with «REDACTED» before anything is written.'],
+      analystNotes: 'Analyst notes', profile: 'Profile', fw: 'Framework', phpHints: 'PHP version hints', code: 'Code', minified: 'Minified files', thirdParty: 'Non-Composer libraries', git: 'Git', none: 'none', notDetected: 'not detected', notGit: 'not a git repo', fromSrc: 'from', minifiedTxt: (n) => `${n} files; locations are shown as code excerpts.`,
+      mustScanner: 'Must fix (scanner)', deadOn: (t) => `not run on ${t}`, lintStat: 'php -l errors', pkgStat: 'Composer packages',
+      libTitle: 'Composer libraries', noComposer: 'This repo does not use Composer.', notSet: 'not set', notAllow: (t) => `does not allow ${t}`, mustChange: (t) => `must be changed to ${t}`, noLock: 'no composer.lock',
+      pkg: 'Package', installed: 'Installed', latestSame: 'Latest in same major', latestCompat: (t) => `Latest supporting ${t}`, notes: 'Notes', abandoned: 'abandoned', replaceWith: 'replace with', dev: 'dev', noPkgs: 'No packages.',
+      extTitle: (n) => `PHP extensions required by packages (${n})`, ext: 'Extension', requiredBy: 'Required by', inTarget: 'Status on target PHP', removedSince: (v) => `removed from core since ${v}`, available: 'available',
+      findings: 'Code findings', findingsLead: 'Click a row to see the locations. <b>Rector</b>: <i>yes</i> means Rector can fix it automatically in this repo; <i>available</i> means a Rector rule exists.',
+      showGuarded: (t) => `show code that does not run on ${t}`, search: 'Search file or issue', noFindings: 'No findings for this filter.',
+      level: 'Level', since: 'Since', issue: 'Issue and fix', count: 'Count', confidence: 'Confidence', files: 'file(s)', guardedBy: 'Guarded by', showMore: (n) => `Show ${n} more`, yes: 'yes', avail: 'available',
+      guard: { mati: 'not run on the target version', jalan: 'runs on the target version', '?': 'condition could not be evaluated' },
+      lintSum: (p, e, d, f) => `Proof from PHP ${p} (php -l): ${e} error(s), ${d} deprecation(s) in ${f} files`, lintFail: 'Lint failed to run.', noLintErr: 'No parse or fatal errors.', parseErr: 'Parse / fatal errors', compileDep: 'Compile-time deprecations',
+      pcSum: (v, n, k) => `PHPCompatibility (testVersion ${v}): ${n} message(s), ${k} kind(s)`, pcFail: 'PHPCompatibility: failed to run', sniff: 'Sniff', type: 'Type', example: 'Example', noMsg: 'No messages.',
+      rcSum: (s, n) => `Rector ${s} (dry-run): ${n} file(s) can be changed automatically`, rcFail: 'Rector: failed to run', rcNote: 'This set also contains optional modernisation, e.g. array() to []. Not every change is required for compatibility.', rcRule: 'Rector rule', noChange: 'No changes.',
+      current: 'Current', suggested: 'Suggested',
+      cmpLead: (o, of, n, nf, a) => `<span class="mono">${o}</span> (${of} files) → <span class="mono">${n}</span> (${nf} files), tested against <span class="mono">${a}</span>.`,
+      overrideConflicts: 'Override conflicts in the application', apiUsage: 'Uses of removed or changed API', localPatched: 'Locally patched framework files', filesChanged: (c, a, r) => `Files changed · ${a} added · ${r} removed`,
+      cmpTable: (t, o, n) => `PHP ${t} findings: ${o} vs ${n}`, cmpTableLead: (t) => `Counts exclude code proven not to run on ${t}.`, parseErrRow: 'Parse errors (php -l)', compileDepRow: 'Compile-time deprecations', deadRow: (t) => `Guarded code not run on ${t}`,
+      localTitle: 'Local patches in the old framework', localLead: 'Compared with the official release after normalising comments and whitespace. These changes must be re-applied to the new version.', noLocal: 'No local patches, or no official release was given.',
+      compatTitle: 'Application class compatibility', compatLead: 'Every application method or property that overrides a framework class is checked against PHP signature rules. A violation is a fatal error when the class loads.', noConflict: 'No conflicts.', perParent: 'Application classes per framework parent:', member: 'Class::member', problem: 'Problem', signature: 'Signature',
+      usageTitle: 'Removed or changed API used by the application', noUsage: 'No calls to removed methods or functions, and every call passes enough required arguments.', loc: 'Location', kind: 'Kind', api: 'API', call: 'Call',
+      config: 'Config', cfgFile: 'File', cfgNew: 'New keys in the new version (not in the app)', cfgUnused: 'App keys no longer read',
+      sigChanged: (n) => `Changed method signatures (${n})`, method: 'Method', oldNew: 'Old → new', moreReq: 'more required args', retAdded: 'new return type',
+      removedTitle: 'Removed methods, classes and functions', classes: 'Classes', methods: 'Methods', functions: 'Functions', funcChanged: 'Changed functions', filesAddRem: 'Files added / removed', addedL: 'Added', removedL: 'Removed',
+      footer: (n) => `Read-only report: no file in the audited repos was changed. ${n} sensitive value(s) were redacted.`, footerData: 'Raw data per scan lives in the history store: <entity>/scans/<scan-id>/.'
+    },
+    id: {
+      menu: 'Buka menu', menuLabel: 'Menu laporan', grpReport: 'Laporan', grpRepos: 'Repo', grpCompare: 'Perbandingan', overview: 'Ringkasan',
+      target: 'Target', generated: 'Dibuat', runOn: 'Dijalankan di PHP', scans: 'scan', copyLink: 'Salin link halaman ini', copied: 'Link disalin', copyManual: 'Salin manual dari kotak ini',
+      sev: { wajib: ['Wajib diubah', 'error atau fatal, atau kode tidak lagi berjalan'], deprecated: ['Deprecated', 'masih jalan, muncul warning, akan rusak di PHP 9'], perilaku: ['Perilaku berubah', 'tidak error, hasilnya bisa berbeda'], info: ['Info', 'catatan, tidak mendesak'] },
+      lib: { 'aman': 'Aman', 'perlu-upgrade': 'Perlu upgrade', 'tidak-didukung': 'Tidak didukung', 'cek-manual': 'Cek manual' },
+      autoStatus: { ok: 'Siap', dep: 'Perlu penyesuaian', must: 'Belum siap' },
+      version: 'Versi scan', latest: 'terbaru', olderView: 'Anda sedang melihat scan lama.', toLatest: 'Ke versi terbaru',
+      vsPrev: 'Dibanding scan sebelumnya', resolved: 'teratasi', added: 'baru', unchanged: 'tetap', firstScan: 'Scan pertama untuk repo ini.',
+      carried: (d) => `Catatan analis dibawa dari scan ${d} dan belum ditinjau ulang untuk scan ini.`,
+      dashboard: 'Dashboard', reposAudited: 'Repo diaudit', phpFiles: 'File PHP', lines: 'baris', mustItems: 'Hal wajib di repo (catatan analis)',
+      depInCode: 'Deprecation di kode', behInCode: 'Perubahan perilaku (perlu review)', lintErr: (t) => `Error php -l di PHP ${t}`, pkgs: 'Package Composer', pkgCheck: 'perlu dicek',
+      overrideConf: 'Konflik override (merge framework)', mustList: 'Yang wajib ditangani', distribution: 'Temuan kode', status: 'Status', repo: 'Repo', framework: 'Framework', packages: 'Package', lastScan: 'Scan terakhir',
+      goal: 'Tujuan scan', conclusion: 'Kesimpulan', steps: 'Langkah yang disarankan', comparisons: 'Perbandingan', perRepo: 'Per repo', crossNotes: 'Catatan lintas repo',
+      perRepoLead: (t) => `Hitungan temuan kode tidak termasuk kode yang dijaga pengecekan versi atau ekstensi dan terbukti tidak dijalankan di PHP ${t}. Status mengikuti hasil review analis di tiap halaman.`,
+      runtimeTitle: 'Perlu dicek saat aplikasi berjalan', runtimeLead: (t) => `Perubahan berikut bergantung pada isi variabel saat runtime, jadi tidak bisa dipastikan dari membaca kode. Jalankan di PHP ${t} dengan error_reporting(E_ALL), lalu periksa log.`,
+      runtime: ['<b>null ke parameter fungsi bawaan</b> (8.1, deprecated): <code>strlen(null)</code>, <code>trim(null)</code>, <code>str_replace(..., null)</code>.', '<b>count() pada nilai yang bukan array atau Countable</b> (8.0, TypeError).', '<b>Aritmetika pada string bukan angka</b> (8.0, TypeError): <code>"abc" + 1</code>.', '<b>Akses properti atau offset dari null/non-object</b> (8.0): Warning; menulis ke non-object menjadi Error.', '<b>Dynamic property pada class turunan</b> (8.2, deprecated): scanner hanya memeriksa class tanpa parent.', '<b>Increment string non-angka</b>, <b>ord(\'\')</b>, <b>chr() di luar 0-255</b> (8.3/8.5, deprecated).', '<b>Cast float ke int yang tidak muat</b> dan <b>destructuring nilai bukan array</b> (8.5, Warning).', '<b>Callback sort yang mengembalikan bool</b> (8.0, deprecated): ganti dengan <code>&lt;=&gt;</code>.'],
+      methodTitle: 'Cara audit ini dibuat',
+      method: ['<b>Scanner kode</b>: tokenizer PHP dengan aturan dari panduan migrasi resmi php.net 7.1 sampai 8.5. Kode yang dijaga <code>if (PHP_VERSION_ID &lt; ...)</code> atau sejenisnya dievaluasi terhadap versi target.', '<b>Bukti dari PHP</b>: <code>php -l</code> dengan binary target ke semua file, plus memuat class di PHP target bila memungkinkan.', '<b>Library</b>: constraint <code>php</code> setiap package di <code>composer.lock</code> dicocokkan dengan versi target, plus metadata Packagist. Package privat tidak pernah dikirim ke Packagist.', '<b>Pembanding</b>: PHPCompatibility dan Rector <code>--dry-run</code>. Repo yang diaudit tidak pernah diubah.', '<b>Penyensoran</b>: rahasia di potongan kode, catatan, dan contoh kode diganti «REDACTED» sebelum apa pun ditulis.'],
+      analystNotes: 'Catatan analis', profile: 'Profil', fw: 'Framework', phpHints: 'Petunjuk versi PHP', code: 'Kode', minified: 'File minified', thirdParty: 'Library non-Composer', git: 'Git', none: 'tidak ada', notDetected: 'tidak terdeteksi', notGit: 'bukan repo git', fromSrc: 'dari', minifiedTxt: (n) => `${n} file; lokasi temuan ditampilkan sebagai potongan kode.`,
+      mustScanner: 'Wajib diubah (scanner)', deadOn: (t) => `mati di ${t}`, lintStat: 'Error dari php -l', pkgStat: 'Package Composer',
+      libTitle: 'Library Composer', noComposer: 'Repo ini tidak memakai Composer.', notSet: 'tidak diisi', notAllow: (t) => `tidak mengizinkan ${t}`, mustChange: (t) => `harus diubah ke ${t}`, noLock: 'tidak ada composer.lock',
+      pkg: 'Package', installed: 'Terpasang', latestSame: 'Terbaru di major sama', latestCompat: (t) => `Terbaru yang mendukung ${t}`, notes: 'Catatan', abandoned: 'abandoned', replaceWith: 'ganti ke', dev: 'dev', noPkgs: 'Tidak ada package.',
+      extTitle: (n) => `Ekstensi PHP yang dibutuhkan package (${n})`, ext: 'Ekstensi', requiredBy: 'Dibutuhkan oleh', inTarget: 'Status di PHP target', removedSince: (v) => `dihapus dari core sejak ${v}`, available: 'tersedia',
+      findings: 'Temuan kode', findingsLead: 'Klik baris untuk melihat lokasinya. Kolom <b>Rector</b>: <i>ya</i> berarti Rector bisa memperbaiki otomatis di repo ini; <i>tersedia</i> berarti aturan Rector-nya ada.',
+      showGuarded: (t) => `tampilkan kode yang tidak dijalankan di ${t}`, search: 'Cari file atau masalah', noFindings: 'Tidak ada temuan untuk filter ini.',
+      level: 'Tingkat', since: 'Sejak', issue: 'Masalah dan perbaikan', count: 'Jumlah', confidence: 'Keyakinan', files: 'file', guardedBy: 'Dijaga', showMore: (n) => `Tampilkan ${n} lagi`, yes: 'ya', avail: 'tersedia',
+      guard: { mati: 'tidak dijalankan di versi target', jalan: 'dijalankan di versi target', '?': 'kondisi tidak bisa dievaluasi' },
+      lintSum: (p, e, d, f) => `Bukti dari PHP ${p} (php -l): ${e} error, ${d} deprecation dari ${f} file`, lintFail: 'Lint gagal dijalankan.', noLintErr: 'Tidak ada parse error atau fatal error.', parseErr: 'Parse / fatal error', compileDep: 'Deprecation saat kompilasi',
+      pcSum: (v, n, k) => `PHPCompatibility (testVersion ${v}): ${n} pesan, ${k} jenis`, pcFail: 'PHPCompatibility: gagal dijalankan', sniff: 'Sniff', type: 'Tipe', example: 'Contoh', noMsg: 'Tidak ada pesan.',
+      rcSum: (s, n) => `Rector ${s} (dry-run): ${n} file bisa diubah otomatis`, rcFail: 'Rector: gagal dijalankan', rcNote: 'Set ini juga berisi modernisasi opsional, misalnya array() menjadi []. Tidak semua perubahan wajib untuk kompatibilitas.', rcRule: 'Aturan Rector', noChange: 'Tidak ada perubahan.',
+      current: 'Saat ini', suggested: 'Disarankan',
+      cmpLead: (o, of, n, nf, a) => `<span class="mono">${o}</span> (${of} file) → <span class="mono">${n}</span> (${nf} file), diuji terhadap aplikasi <span class="mono">${a}</span>.`,
+      overrideConflicts: 'Konflik override di aplikasi', apiUsage: 'Pemakaian API yang hilang/berubah', localPatched: 'File framework dipatch lokal', filesChanged: (c, a, r) => `File berubah · ${a} baru · ${r} dihapus`,
+      cmpTable: (t, o, n) => `Temuan PHP ${t}: ${o} vs ${n}`, cmpTableLead: (t) => `Hitungan tidak termasuk kode yang terbukti tidak dijalankan di ${t}.`, parseErrRow: 'Parse error (php -l)', compileDepRow: 'Deprecation saat kompilasi', deadRow: (t) => `Kode dijaga, mati di ${t}`,
+      localTitle: 'Patch lokal di framework lama', localLead: 'Dibandingkan dengan rilis resmi setelah komentar dan spasi dinormalisasi. Perubahan ini harus diterapkan ulang di versi baru.', noLocal: 'Tidak ada patch lokal, atau rilis resmi tidak diberikan.',
+      compatTitle: 'Kompatibilitas class aplikasi', compatLead: 'Setiap method dan properti di class aplikasi yang meng-override class framework dicek dengan aturan signature PHP. Pelanggarannya menyebabkan fatal error saat class dimuat.', noConflict: 'Tidak ada konflik.', perParent: 'Class aplikasi per induk framework:', member: 'Class::member', problem: 'Masalah', signature: 'Signature',
+      usageTitle: 'Pemakaian API yang hilang atau berubah di aplikasi', noUsage: 'Tidak ada pemanggilan method/fungsi yang dihapus, dan semua pemanggilan sudah mengirim argumen wajib yang cukup.', loc: 'Lokasi', kind: 'Jenis', api: 'API', call: 'Pemanggilan',
+      config: 'Config', cfgFile: 'File', cfgNew: 'Key baru di versi baru (belum ada di aplikasi)', cfgUnused: 'Key aplikasi yang tidak dibaca lagi',
+      sigChanged: (n) => `Signature method yang berubah (${n})`, method: 'Method', oldNew: 'Lama → baru', moreReq: 'argumen wajib bertambah', retAdded: 'return type baru',
+      removedTitle: 'Method, class, dan fungsi yang dihapus', classes: 'Class', methods: 'Method', functions: 'Fungsi', funcChanged: 'Fungsi berubah', filesAddRem: 'File ditambah/dihapus', addedL: 'Baru', removedL: 'Dihapus',
+      footer: (n) => `Laporan read-only: tidak ada file di repo yang diaudit yang diubah. ${n} nilai sensitif disensor.`, footerData: 'Data mentah per scan ada di history store: <entitas>/scans/<scan-id>/.'
+    }
+  };
+  const T = I18N[LANG];
+  const SEV_ORDER = ['wajib', 'deprecated', 'perilaku', 'info'];
+  const LIB_CLASS = { 'aman': 's-ok', 'perlu-upgrade': 's-deprecated', 'tidak-didukung': 's-wajib', 'cek-manual': 's-perilaku' };
+  const LEVEL_CLASS = { wajib: 's-wajib', deprecated: 's-deprecated', perilaku: 's-perilaku', ok: 's-ok', info: 's-info' };
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const pill = (sev, text) => `<span class="pill s-${esc(sev)}">${esc(text || (T.sev[sev] ? T.sev[sev][0] : sev))}</span>`;
+  const locale = LANG === 'id' ? 'id-ID' : 'en-GB';
+  const fmtDate = (iso) => { try { return new Date(iso).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return iso; } };
+  const scanDate = (v) => fmtDate(v.generated_at || '');
+  const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  const num = (n) => Number(n || 0).toLocaleString(locale);
+
+  // ---------- data model: entities with versions (oldest → newest)
+  const entities = DATA.entities || [];
+  const repos = entities.filter((e) => e.kind === 'repo');
+  const compares = entities.filter((e) => e.kind === 'compare' && !e.hidden);
+  const visibleRepos = repos.filter((e) => !e.hidden);
+  const latest = (e) => e.versions[e.versions.length - 1];
+  const byName = (n) => entities.find((e) => e.name === n);
+  const overview = DATA.overview || {};
+  const target = (visibleRepos[0] && latest(visibleRepos[0]).target) || (repos[0] && latest(repos[0]).target) || '';
+
+  function analyse(r) {
+    const scan = r.scan || {};
+    const rules = scan.rules || {};
+    const counts = { wajib: 0, deprecated: 0, perilaku: 0, info: 0 };
+    const guarded = { wajib: 0, deprecated: 0, perilaku: 0, info: 0 };
+    for (const f of scan.findings || []) {
+      const sev = (rules[f.rule] || {}).sev || 'info';
+      (f.guarded ? guarded : counts)[sev]++;
+    }
+    const libs = { 'aman': 0, 'perlu-upgrade': 0, 'tidak-didukung': 0, 'cek-manual': 0 };
+    for (const p of ((r.libs || {}).packages || [])) libs[p.status] = (libs[p.status] || 0) + 1;
+    const lintErr = ((r.lint || {}).errors || []).length;
+    const lintDep = ((r.lint || {}).deprecations || []).length;
+    const removedExt = ((r.libs || {}).extensions || []).filter((e) => e.removed_in).length;
+    let status = ['s-ok', T.autoStatus.ok];
+    if (counts.wajib || lintErr || libs['tidak-didukung'] || removedExt) status = ['s-wajib', T.autoStatus.must];
+    else if (counts.deprecated || counts.perilaku || libs['perlu-upgrade'] || libs['cek-manual'] || lintDep) status = ['s-deprecated', T.autoStatus.dep];
+    if (r.status && r.status.label) status = [LEVEL_CLASS[r.status.level] || 's-info', r.status.label];
+    return { counts, guarded, libs, lintErr, lintDep, status };
+  }
+  const compareStatus = (c) => c.status && c.status.label ? [LEVEL_CLASS[c.status.level] || 's-info', c.status.label] : ['s-info', T.comparisons];
+
+  /** Live (not guarded-dead) findings keyed by rule|file|code so line shifts do not count as changes. */
+  function findingKeys(v) {
+    const set = new Map();
+    for (const f of ((v.scan || {}).findings || [])) {
+      if (f.guarded) continue;
+      const k = f.rule + '|' + f.file + '|' + String(f.code || '').replace(/\s+/g, ' ').trim();
+      set.set(k, (set.get(k) || 0) + 1);
+    }
+    return set;
+  }
+  function delta(prev, cur) {
+    const a = findingKeys(prev), b = findingKeys(cur);
+    let resolved = 0, added = 0, same = 0;
+    for (const [k, n] of a) { const m = b.get(k) || 0; resolved += Math.max(0, n - m); same += Math.min(n, m); }
+    for (const [k, n] of b) { added += Math.max(0, n - (a.get(k) || 0)); }
+    return { resolved, added, same };
+  }
+
+  // ---------- pages and routing:  #overview  |  #<entity>  |  #<entity>~<scan-id>
+  const pages = [{ id: 'overview', label: T.overview, render: renderOverview }];
+  visibleRepos.forEach((e) => pages.push({ id: slug(e.name), entity: e, label: e.name, cls: analyse(latest(e)).status[0], render: (v) => renderRepo(e, v) }));
+  compares.forEach((e) => pages.push({ id: slug(e.name), entity: e, label: e.name, cmp: true, cls: compareStatus(latest(e))[0], render: (v) => renderCompare(e, v) }));
+  const ALIASES = { ringkasan: 'overview' };
+
+  function parseHash() {
+    let raw = decodeURIComponent(location.hash.slice(1));
+    let [id, ver] = raw.split('~');
+    id = ALIASES[id] || id;
+    const page = pages.find((p) => p.id === id) || pages[0];
+    let version = null;
+    if (page.entity) {
+      version = page.entity.versions.find((v) => v.scan_id === ver) || latest(page.entity);
+    }
+    return { page, version };
+  }
+  const token = (page, version) => page.entity && version && version !== latest(page.entity) ? `${page.id}~${version.scan_id}` : page.id;
+
+  document.getElementById('menuBtn').setAttribute('aria-label', T.menu);
+  document.getElementById('sidebar').setAttribute('aria-label', T.menuLabel);
+  document.getElementById('top-ver').textContent = `PHP 7.x → ${target}`;
+  document.getElementById('page-meta').innerHTML = [
+    `<span>${esc(T.target)} <b>PHP ${esc(target)}</b></span>`,
+    `<span>${esc(T.generated)} <b>${esc(fmtDate(DATA.generated_at))}</b></span>`
+  ].join('');
+  const navItem = (p) => `<li><a href="#${esc(p.id)}" data-page="${esc(p.id)}">${esc(p.label)}${p.entity && p.entity.versions.length > 1 ? ` <span class="cnt">×${p.entity.versions.length}</span>` : ''}${p.cls ? `<span class="dot ${p.cls}" aria-hidden="true"></span>` : ''}</a></li>`;
+  const grp = (title, items) => items.length ? `<div class="d-grp"><div class="d-grp-t">${esc(title)}</div><ul class="d-nav">${items.map(navItem).join('')}</ul></div>` : '';
+  document.getElementById('nav').innerHTML = grp(T.grpReport, pages.filter((p) => !p.entity)) + grp(T.grpRepos, pages.filter((p) => p.entity && !p.cmp)) + grp(T.grpCompare, pages.filter((p) => p.cmp));
+
+  const menuBtn = document.getElementById('menuBtn');
+  const setNav = (open) => { document.body.classList.toggle('nav-open', open); menuBtn.setAttribute('aria-expanded', String(open)); };
+  menuBtn.addEventListener('click', () => setNav(!document.body.classList.contains('nav-open')));
+  document.getElementById('scrim').addEventListener('click', () => setNav(false));
+  document.getElementById('nav').addEventListener('click', (e) => { if (e.target.closest('a')) setNav(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setNav(false); });
+
+  const host = document.getElementById('pages');
+  const rendered = {};
+  function show() {
+    const { page, version } = parseHash();
+    const key = page.id + '~' + (version ? version.scan_id : '');
+    if (!rendered[key]) {
+      const el = document.createElement('div');
+      el.className = 'page';
+      el.innerHTML = linkBar(page, version) + (page.entity ? versionBar(page, version) : '') + page.render(version);
+      host.appendChild(el);
+      rendered[key] = el;
+      if (page.entity && !page.cmp) wireFindings(el, version);
+      const sel = el.querySelector('[data-role="version"]');
+      if (sel) sel.addEventListener('change', () => { const v = page.entity.versions.find((x) => x.scan_id === sel.value); location.hash = token(page, v); });
+    }
+    Object.entries(rendered).forEach(([k, el]) => { el.hidden = k !== key; });
+    document.querySelectorAll('#nav a').forEach((a) => { if (a.dataset.page === page.id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    const active = document.querySelector(`#nav a[data-page="${CSS.escape(page.id)}"]`);
+    if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' });
+  }
+  window.addEventListener('hashchange', () => { show(); window.scrollTo(0, 0); });
+
+  // ---------- link bar + version bar
+  const pageLink = (tok) => (DATA.url ? DATA.url.replace(/#.*$/, '') : location.href.split('#')[0]) + '#' + tok;
+  function linkBar(page, version) {
+    const tok = token(page, version);
+    return `<div class="linkbar"><span class="mono">#${esc(tok)}</span>
+      <button type="button" class="chip" data-copy="${esc(tok)}">${esc(T.copyLink)}</button>
+      <input type="text" readonly class="linkfield" aria-label="Link" hidden></div>`;
+  }
+  host.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-copy]');
+    if (!b) return;
+    const link = pageLink(b.dataset.copy);
+    const field = b.parentElement.querySelector('.linkfield');
+    field.value = link;
+    const fallback = () => { field.hidden = false; field.focus(); field.select(); b.textContent = T.copyManual; };
+    try {
+      navigator.clipboard.writeText(link).then(() => { b.textContent = T.copied; setTimeout(() => { b.textContent = T.copyLink; }, 2000); }, fallback);
+    } catch (err) { fallback(); }
+  });
+  function versionBar(page, version) {
+    const vs = page.entity.versions;
+    const idx = vs.indexOf(version);
+    const isLatest = idx === vs.length - 1;
+    const opts = vs.slice().reverse().map((v) => `<option value="${esc(v.scan_id)}"${v === version ? ' selected' : ''}>${esc(scanDate(v))}${v === latest(page.entity) ? ' · ' + esc(T.latest) : ''}</option>`).join('');
+    let d = '';
+    if (!page.cmp) {
+      if (idx > 0) {
+        const x = delta(vs[idx - 1], version);
+        d = `<span class="delta">${esc(T.vsPrev)} (${esc(scanDate(vs[idx - 1]))}): <span class="pill s-ok">${x.resolved} ${esc(T.resolved)}</span> <span class="pill s-wajib">${x.added} ${esc(T.added)}</span> <span class="pill s-info">${x.same} ${esc(T.unchanged)}</span></span>`;
+      } else {
+        d = `<span class="delta">${esc(T.firstScan)}</span>`;
+      }
+    }
+    return `<div class="verbar"><label>${esc(T.version)} <select data-role="version" aria-label="${esc(T.version)}">${opts}</select></label>
+      <span class="sub">${vs.length} ${esc(T.scans)}</span>
+      ${isLatest ? '' : `<span class="old">${esc(T.olderView)}</span> <a href="#${esc(page.id)}">${esc(T.toLatest)}</a>`}
+      ${d}</div>
+      ${version.carried_from ? `<div class="banner">${esc(T.carried(scanDate(vs.find((v) => v.scan_id === version.carried_from) || { generated_at: version.carried_from })))}</div>` : ''}`;
+  }
+
+  // ---------- overview
+  function renderOverview() {
+    const goal = overview.goal;
+    const rows = visibleRepos.map((e) => {
+      const v = latest(e), a = analyse(v), fw = (v.profile || {}).framework;
+      return `<tr><td><a href="#${esc(slug(e.name))}">${esc(e.name)}</a></td><td><span class="pill ${a.status[0]}">${esc(a.status[1])}</span></td>
+        <td>${fw ? esc(fw.name + ' ' + (fw.version || '')) : '<span class="sub">-</span>'}</td>
+        <td class="num">${a.counts.wajib}</td><td class="num">${a.counts.deprecated}</td><td class="num">${a.counts.perilaku}</td><td class="num">${a.lintErr}</td>
+        <td>${esc(scanDate(v))}<div class="sub">${e.versions.length} ${esc(T.scans)}</div></td></tr>`;
+    }).join('');
+    return `
+      ${dashboardHtml()}
+      ${goal ? `<section><h2>${esc(goal.title || T.goal)}</h2>
+        <p class="lead">${esc(goal.text || '')}</p>
+        ${(goal.points || []).length ? `<ul class="checklist">${goal.points.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+        ${(goal.scope || []).length ? `<dl class="profile">${goal.scope.map((x) => `<dt>${esc(x.k)}</dt><dd>${esc(x.v)}</dd>`).join('')}</dl>` : ''}</section>` : ''}
+      ${overview.summary ? `<section><h2>${esc(T.conclusion)}</h2><div class="summary"><p>${esc(overview.summary)}</p></div></section>` : ''}
+      ${(overview.steps || []).length ? `<section><h2>${esc(T.steps)}</h2><ol class="steps">${overview.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol></section>` : ''}
+      ${compares.length ? `<section><h2>${esc(T.comparisons)}</h2><div class="cards">${compares.map((e) => { const c = latest(e), st = compareStatus(c); return `<a class="card" href="#${esc(slug(e.name))}"><h3>${esc(e.name)}</h3><span><span class="pill ${st[0]}">${esc(st[1])}</span></span><p class="sub">${esc((c.old || {}).path)} → ${esc((c.new || {}).path)} · ${esc((c.app || {}).path)}</p></a>`; }).join('')}</div></section>` : ''}
+      <section>
+        <h2>${esc(T.perRepo)}</h2><p class="lead">${esc(T.perRepoLead(target))}</p>
+        <div class="legend">${SEV_ORDER.map((s) => `<span>${pill(s)} ${esc(T.sev[s][1])}</span>`).join('')}</div>
+        <div class="table-scroll"><table><thead><tr><th>${esc(T.repo)}</th><th>${esc(T.status)}</th><th>${esc(T.framework)}</th><th class="num">${esc(T.sev.wajib[0])}</th><th class="num">${esc(T.sev.deprecated[0])}</th><th class="num">${esc(T.sev.perilaku[0])}</th><th class="num">php -l</th><th>${esc(T.lastScan)}</th></tr></thead><tbody>${rows}</tbody></table></div>
+      </section>
+      ${(overview.notes || []).length ? `<section><h2>${esc(T.crossNotes)}</h2>${notesHtml(overview.notes)}</section>` : ''}
+      <section><h2>${esc(T.runtimeTitle)}</h2><p class="lead">${esc(T.runtimeLead(target))}</p><ul class="checklist">${T.runtime.map((x) => `<li>${x}</li>`).join('')}</ul></section>
+      <section><h2>${esc(T.methodTitle)}</h2><ul class="checklist">${T.method.map((x) => `<li>${x}</li>`).join('')}</ul></section>`;
+  }
+
+  function dashboardHtml() {
+    const all = visibleRepos.map((e) => ({ e, v: latest(e), a: analyse(latest(e)) }));
+    const sum = (f) => all.reduce((n, x) => n + f(x), 0);
+    const files = sum((x) => (x.v.profile || {}).php_files || 0);
+    const lines = sum((x) => (x.v.profile || {}).php_lines || 0);
+    const pkgs = sum((x) => ((x.v.libs || {}).packages || []).length);
+    const toCheck = sum((x) => x.a.libs['tidak-didukung'] + x.a.libs['perlu-upgrade'] + x.a.libs['cek-manual']);
+    const blockers = [].concat(...all.map((x) => (x.v.notes || []).filter((n) => n.sev === 'wajib').map((n) => ({ repo: x.e.name, title: n.title }))));
+    const maxFind = Math.max(1, ...all.map((x) => x.a.counts.wajib + x.a.counts.deprecated + x.a.counts.perilaku));
+    const bar = (a) => ['wajib', 'deprecated', 'perilaku'].map((k) => a.counts[k] ? `<span class="seg ${k}" style="flex:${a.counts[k]}" title="${esc(T.sev[k][0])}: ${a.counts[k]}"></span>` : '').join('');
+    const noLint = all.every((x) => x.a.lintErr === 0);
+    const conflicts = compares.length ? (((latest(compares[0]).overrides || {}).new) || []).length : '-';
+    return `<section>
+      <h2>${esc(T.dashboard)}</h2>
+      <div class="stats">
+        <div class="stat"><span class="v">${visibleRepos.length}</span><span class="k">${esc(T.reposAudited)}</span></div>
+        <div class="stat"><span class="v">${num(files)}</span><span class="k">${esc(T.phpFiles)} · ${num(lines)} ${esc(T.lines)}</span></div>
+        <div class="stat ${blockers.length ? 'wajib' : 'ok'}"><span class="v">${blockers.length}</span><span class="k">${esc(T.mustItems)}</span></div>
+        <div class="stat deprecated"><span class="v">${sum((x) => x.a.counts.deprecated)}</span><span class="k">${esc(T.depInCode)}</span></div>
+        <div class="stat perilaku"><span class="v">${sum((x) => x.a.counts.perilaku)}</span><span class="k">${esc(T.behInCode)}</span></div>
+        <div class="stat ${noLint ? 'ok' : 'wajib'}"><span class="v">${sum((x) => x.a.lintErr)}</span><span class="k">${esc(T.lintErr(target))}</span></div>
+        <div class="stat"><span class="v">${pkgs}</span><span class="k">${esc(T.pkgs)} · ${toCheck} ${esc(T.pkgCheck)}</span></div>
+        ${compares.length ? `<div class="stat"><span class="v">${conflicts}</span><span class="k">${esc(T.overrideConf)}</span></div>` : ''}
+      </div>
+      <div class="table-scroll"><table class="dash"><thead><tr><th>${esc(T.repo)}</th><th>${esc(T.status)}</th><th>${esc(T.distribution)}</th><th class="num">${esc(T.packages)}</th></tr></thead><tbody>
+        ${all.map(({ e, v, a }) => { const n = a.counts.wajib + a.counts.deprecated + a.counts.perilaku;
+          return `<tr><td><a href="#${esc(slug(e.name))}">${esc(e.name)}</a></td><td><span class="pill ${a.status[0]}">${esc(a.status[1])}</span></td>
+          <td><div class="bar" style="width:${Math.max(8, Math.round(n / maxFind * 100))}%">${bar(a) || '<span class="seg none"></span>'}</div><div class="sub">${a.counts.wajib} ${esc(T.sev.wajib[0].toLowerCase())} · ${a.counts.deprecated} deprecated · ${a.counts.perilaku} ${esc(T.sev.perilaku[0].toLowerCase())}</div></td>
+          <td class="num">${((v.libs || {}).packages || []).length}</td></tr>`; }).join('')}
+      </tbody></table></div>
+      ${blockers.length ? `<div><h3>${esc(T.mustList)}</h3><ul class="checklist">${blockers.map((b) => `<li><a href="#${esc(slug(b.repo))}">${esc(b.repo)}</a>: ${esc(b.title)}</li>`).join('')}</ul></div>` : ''}
+    </section>`;
+  }
+
+  function notesHtml(notes) {
+    if (!notes || !notes.length) return '';
+    return `<div class="notes">` + notes.map((n) =>
+      `<div class="note"><div class="note-head">${pill(n.sev || 'info')}<h3>${esc(n.title)}</h3></div><p>${esc(n.body)}</p>${n.files ? `<div class="files">${n.files.map((f) => `<span class="tag mono">${esc(f)}</span>`).join('')}</div>` : ''}${codeHtml(n.code)}</div>`
+    ).join('') + `</div>`;
+  }
+  function codeHtml(list) {
+    if (!list || !list.length) return '';
+    return list.map((c) => `<div class="codecmp">
+      ${c.where ? `<div class="codewhere mono">${esc(c.where)}</div>` : ''}
+      <div class="codegrid">
+        <div class="codecol"><div class="codelabel before">${esc(T.current)}</div><pre class="code">${esc(c.before || '')}</pre></div>
+        <div class="codecol"><div class="codelabel after">${esc(T.suggested)}</div><pre class="code">${esc(c.after || '')}</pre></div>
+      </div>
+      ${c.note ? `<p class="sub">${esc(c.note)}</p>` : ''}
+    </div>`).join('');
+  }
+
+  // ---------- repo page
+  function renderRepo(e, r) {
+    const a = analyse(r);
+    const p = r.profile || {};
+    const git = p.git ? `${esc(p.git.branch || '')} @ <span class="mono">${esc(p.git.commit || '')}</span> (${esc(p.git.date || '')})` : esc(T.notGit);
+    const hints = (p.php_hints || []).map((h) => `<div><span class="mono">${esc(h.value)}</span> <span class="sub">${esc(T.fromSrc)} ${esc(h.source)}</span></div>`).join('') || `<span class="sub">${esc(T.none)}</span>`;
+    const tp = (p.third_party_dirs || []).map((d) => `<div><span class="mono">${esc(d.dir)}/</span> ${d.entries.slice(0, 12).map((x) => `<span class="tag">${esc(x)}</span>`).join('')}${d.entries.length > 12 ? ` <span class="sub">+${d.entries.length - 12}</span>` : ''}</div>`).join('') || `<span class="sub">${esc(T.none)}</span>`;
+    const mini = p.minified_files || [];
+    const t = r.target || target;
+    return `
+      <div class="page-head"><h2>${esc(e.name)}</h2><span class="pill ${a.status[0]}">${esc(a.status[1])}</span></div>
+      ${r.summary ? `<div class="summary"><p>${esc(r.summary)}</p></div>` : ''}
+      <div class="stats">
+        <div class="stat wajib"><span class="v">${a.counts.wajib}</span><span class="k">${esc(T.mustScanner)}${a.guarded.wajib ? ` · +${a.guarded.wajib} ${esc(T.deadOn(t))}` : ''}</span></div>
+        <div class="stat deprecated"><span class="v">${a.counts.deprecated}</span><span class="k">Deprecated${a.guarded.deprecated ? ` · +${a.guarded.deprecated} ${esc(T.deadOn(t))}` : ''}</span></div>
+        <div class="stat perilaku"><span class="v">${a.counts.perilaku}</span><span class="k">${esc(T.sev.perilaku[0])}</span></div>
+        <div class="stat"><span class="v">${a.lintErr}</span><span class="k">${esc(T.lintStat)}</span></div>
+        <div class="stat"><span class="v">${((r.libs || {}).packages || []).length}</span><span class="k">${esc(T.pkgStat)}</span></div>
+      </div>
+      ${(r.notes || []).length ? `<section><h3>${esc(T.analystNotes)}</h3>${notesHtml(r.notes)}</section>` : ''}
+      <section><h3>${esc(T.profile)}</h3>
+      <dl class="profile">
+        <dt>${esc(T.fw)}</dt><dd>${p.framework ? esc(p.framework.name + ' ' + (p.framework.version || '')) + ` <span class="sub">(${esc(p.framework.source)})</span>` : esc(T.notDetected)}</dd>
+        <dt>${esc(T.phpHints)}</dt><dd>${hints}</dd>
+        <dt>${esc(T.code)}</dt><dd>${num(p.php_files)} ${esc(T.phpFiles)} · ${num(p.php_lines)} ${esc(T.lines)}</dd>
+        <dt>${esc(T.minified)}</dt><dd>${mini.length ? esc(T.minifiedTxt(mini.length)) : esc(T.none)}</dd>
+        <dt>${esc(T.thirdParty)}</dt><dd>${tp}</dd>
+        <dt>${esc(T.git)}</dt><dd>${git}</dd>
+      </dl></section>
+      <section><h3>${esc(T.libTitle)}</h3>${libRootHtml(r.libs)}${libTableHtml(r.libs)}${extHtml(r.libs)}</section>
+      <section>
+        <h3>${esc(T.findings)}</h3><p class="lead">${T.findingsLead}</p>
+        <div class="toolbar">
+          ${SEV_ORDER.map((s) => `<button type="button" class="chip" aria-pressed="true" data-sev="${s}">${esc(T.sev[s][0])}</button>`).join('')}
+          <label><input type="checkbox" data-role="guarded"> ${esc(T.showGuarded(t))}</label>
+          <input type="search" data-role="q" placeholder="${esc(T.search)}" aria-label="${esc(T.search)}">
+        </div>
+        <div class="table-scroll"><table data-role="findings"></table></div>
+      </section>
+      ${lintHtml(r.lint)}${phpcompatHtml(r.phpcompat)}${rectorHtml(r.rector)}`;
+  }
+
+  function libRootHtml(libs) {
+    if (!libs || !libs.composer) return `<p class="lead">${esc(T.noComposer)}</p>`;
+    const root = libs.root || {};
+    const parts = [`<code>require.php</code> = <span class="mono">${esc(root.php || T.notSet)}</span>${root.allows_target === false ? ' ' + pill('wajib', T.notAllow(libs.target)) : ''}`];
+    if (root.platform_php) parts.push(`<code>config.platform.php</code> = <span class="mono">${esc(root.platform_php)}</span> ${pill('wajib', T.mustChange(libs.target))}`);
+    if (!root.has_lock) parts.push(pill('perilaku', T.noLock));
+    return `<p class="lead">${parts.join(' · ')}</p>`;
+  }
+  function libTableHtml(libs) {
+    if (!libs || !libs.composer) return '';
+    const order = { 'tidak-didukung': 0, 'perlu-upgrade': 1, 'cek-manual': 2, 'aman': 3 };
+    const rows = (libs.packages || []).slice().sort((x, y) => (order[x.status] - order[y.status]) || x.name.localeCompare(y.name));
+    if (!rows.length) return `<p class="empty">${esc(T.noPkgs)}</p>`;
+    const sug = (s) => s ? `<span class="mono">${esc(s.version)}</span><div class="sub">php ${esc(s.php || '-')}${s.released ? ' · ' + esc(s.released) : ''}</div>` : '<span class="sub">-</span>';
+    return `<div class="table-scroll"><table><thead><tr><th>${esc(T.pkg)}</th><th>${esc(T.installed)}</th><th>PHP</th><th>${esc(T.status)}</th><th>${esc(T.latestSame)}</th><th>${esc(T.latestCompat(libs.target))}</th><th>${esc(T.notes)}</th></tr></thead><tbody>` +
+      rows.map((p) => {
+        const s = p.suggest || {};
+        const notes = [];
+        if (p.abandoned) notes.push(`<span class="tag">${esc(T.abandoned)}${typeof p.abandoned === 'string' ? ': ' + esc(T.replaceWith) + ' ' + esc(p.abandoned) : ''}</span>`);
+        (p.risk || []).forEach((x) => notes.push(`<span class="tag">${esc(x)}</span>`));
+        if (p.dev) notes.push(`<span class="tag">${esc(T.dev)}</span>`);
+        return `<tr><td class="mono">${esc(p.name)}</td><td class="mono">${esc(p.version || p.constraint || '-')}<div class="sub">${esc(p.released || '')}</div></td>
+          <td class="mono">${esc(p.php || '-')}</td><td><span class="pill ${LIB_CLASS[p.status] || 's-info'}">${esc(T.lib[p.status] || p.status)}</span></td>
+          <td>${sug(s.latest_same_major)}</td><td>${sug(s.latest_compatible)}</td><td>${notes.join('')}</td></tr>`;
+      }).join('') + '</tbody></table></div>';
+  }
+  function extHtml(libs) {
+    const ex = (libs && libs.extensions) || [];
+    if (!ex.length) return '';
+    return `<details class="block"${ex.some((e) => e.removed_in) ? ' open' : ''}><summary>${esc(T.extTitle(ex.length))}</summary><div><div class="table-scroll"><table><thead><tr><th>${esc(T.ext)}</th><th>${esc(T.requiredBy)}</th><th>${esc(T.inTarget)}</th></tr></thead><tbody>` +
+      ex.map((e) => `<tr><td class="mono">ext-${esc(e.name)}</td><td>${e.required_by.map((b) => `<span class="tag mono">${esc(b)}</span>`).join('')}</td>
+        <td>${e.removed_in ? pill('wajib', T.removedSince(e.removed_in)) : pill('ok', T.available)}</td></tr>`).join('') + '</tbody></table></div></div></details>';
+  }
+  function lintHtml(lint) {
+    if (!lint || lint.error) return `<p class="empty">${esc(T.lintFail)}</p>`;
+    const errs = lint.errors || [], deps = lint.deprecations || [];
+    const list = (items) => `<ul class="hits">${items.map((x) => `<li><span class="loc">${esc(x.file)}:${x.line} · ${esc(x.type)}</span><code>${esc(x.message)}</code></li>`).join('')}</ul>`;
+    return `<details class="block"${errs.length ? ' open' : ''}><summary>${esc(T.lintSum(lint.php, errs.length, deps.length, num(lint.files_linted)))}</summary><div>
+      ${errs.length ? `<h3>${esc(T.parseErr)}</h3>${list(errs)}` : `<p class="empty">${esc(T.noLintErr)}</p>`}
+      ${deps.length ? `<h3>${esc(T.compileDep)}</h3>${list(deps.slice(0, 500))}` : ''}</div></details>`;
+  }
+  function phpcompatHtml(pc) {
+    if (!pc) return '';
+    if (!pc.ok) return `<details class="block"><summary>${esc(T.pcFail)}</summary><div><p class="sub">phpcompat.json</p></div></details>`;
+    const by = {};
+    for (const m of pc.messages || []) (by[m.source] = by[m.source] || []).push(m);
+    const ids = Object.keys(by).sort((a, b) => by[b].length - by[a].length);
+    return `<details class="block"><summary>${esc(T.pcSum(pc.testVersion, (pc.messages || []).length, ids.length))}</summary><div>
+      ${ids.length ? `<div class="table-scroll"><table><thead><tr><th>${esc(T.sniff)}</th><th>${esc(T.type)}</th><th class="num">${esc(T.count)}</th><th>${esc(T.example)}</th></tr></thead><tbody>` +
+      ids.map((id) => { const m = by[id][0]; return `<tr><td class="mono">${esc(id)}</td><td>${esc(m.type)}</td><td class="num">${by[id].length}</td><td><span class="mono">${esc(m.file)}:${m.line}</span><div class="sub">${esc(m.message)}</div></td></tr>`; }).join('') +
+      `</tbody></table></div>` : `<p class="empty">${esc(T.noMsg)}</p>`}</div></details>`;
+  }
+  function rectorHtml(rc) {
+    if (!rc) return '';
+    if (!rc.ok) return `<details class="block"><summary>${esc(T.rcFail)}</summary><div><p class="sub">rector.json</p></div></details>`;
+    const rules = Object.entries(rc.by_rule || {});
+    return `<details class="block"><summary>${esc(T.rcSum(rc.set, rc.changed_files))}</summary><div><p class="sub">${esc(T.rcNote)}</p>
+      ${rules.length ? `<div class="table-scroll"><table><thead><tr><th>${esc(T.rcRule)}</th><th class="num">${esc(T.files)}</th></tr></thead><tbody>${rules.map(([k, v]) => `<tr><td class="mono">${esc(k)}</td><td class="num">${v}</td></tr>`).join('')}</tbody></table></div>` : `<p class="empty">${esc(T.noChange)}</p>`}</div></details>`;
+  }
+
+  function wireFindings(el, r) {
+    const table = el.querySelector('[data-role="findings"]');
+    if (!table) return;
+    const scan = r.scan || {};
+    const rules = scan.rules || {};
+    const rectorRules = (r.rector && r.rector.by_rule) || {};
+    const state = { sev: new Set(SEV_ORDER), guarded: false, q: '' };
+    const open = new Set();
+    const limits = {};
+    function render() {
+      const groups = {};
+      const q = state.q.toLowerCase();
+      for (const f of scan.findings || []) {
+        const meta = rules[f.rule] || { sev: 'info', title: f.rule };
+        if (!state.sev.has(meta.sev)) continue;
+        if (f.guarded && !state.guarded) continue;
+        if (q && !(f.file.toLowerCase().includes(q) || (meta.title || '').toLowerCase().includes(q) || f.rule.toLowerCase().includes(q) || (f.code || '').toLowerCase().includes(q))) continue;
+        (groups[f.rule] = groups[f.rule] || []).push(f);
+      }
+      const ids = Object.keys(groups).sort((x, y) => SEV_ORDER.indexOf(rules[x].sev) - SEV_ORDER.indexOf(rules[y].sev) || groups[y].length - groups[x].length);
+      if (!ids.length) { table.innerHTML = `<tbody><tr><td class="empty">${esc(T.noFindings)}</td></tr></tbody>`; return; }
+      table.innerHTML = `<thead><tr><th>${esc(T.level)}</th><th>${esc(T.since)}</th><th>${esc(T.issue)}</th><th class="num">${esc(T.count)}</th><th>${esc(T.confidence)}</th><th>Rector</th></tr></thead><tbody>` +
+        ids.map((id) => {
+          const m = rules[id], hits = groups[id];
+          const files = new Set(hits.map((h) => h.file)).size;
+          const auto = m.rector ? (rectorRules[m.rector] ? T.yes : T.avail) : '-';
+          const expanded = open.has(id);
+          const limit = limits[id] || 200;
+          const detail = !expanded ? '' : `<tr class="detail"><td colspan="6"><ul class="hits">` + hits.slice(0, limit).map((h) =>
+            `<li><span class="loc">${esc(h.file)}:${h.line}</span>${h.guard ? `<span class="guard">${esc(T.guardedBy)} <code>${esc(h.guard)}</code>: ${esc(T.guard[h.guard_state] || '')}</span>` : ''}<code>${esc(h.code)}</code></li>`).join('') +
+            (hits.length > limit ? `<li><button type="button" class="more" data-more="${esc(id)}">${esc(T.showMore(hits.length - limit))}</button></li>` : '') + `</ul></td></tr>`;
+          return `<tr class="rule-row" data-rule="${esc(id)}" tabindex="0" aria-expanded="${expanded}"><td><span class="caret">▸</span> ${pill(m.sev)}</td>
+            <td class="mono">${esc(m.ver)}</td>
+            <td><div>${esc(m.title)}</div><div class="sub">${esc(m.fix)} <a href="${esc(m.ref)}" target="_blank" rel="noopener">php.net</a> · <span class="mono">${esc(id)}</span></div></td>
+            <td class="num">${hits.length}<div class="sub">${files} ${esc(T.files)}</div></td><td>${esc(m.conf)}</td><td>${esc(auto)}</td></tr>${detail}`;
+        }).join('') + '</tbody>';
+    }
+    table.addEventListener('click', (ev) => {
+      const more = ev.target.closest('[data-more]');
+      if (more) { limits[more.dataset.more] = Infinity; render(); return; }
+      if (ev.target.closest('a')) return;
+      const row = ev.target.closest('tr.rule-row');
+      if (!row) return;
+      open.has(row.dataset.rule) ? open.delete(row.dataset.rule) : open.add(row.dataset.rule);
+      render();
+    });
+    table.addEventListener('keydown', (ev) => { const row = ev.target.closest('tr.rule-row'); if (row && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); row.click(); } });
+    el.querySelectorAll('[data-sev]').forEach((b) => b.addEventListener('click', () => { const s = b.dataset.sev; state.sev.has(s) ? state.sev.delete(s) : state.sev.add(s); b.setAttribute('aria-pressed', state.sev.has(s)); render(); }));
+    el.querySelector('[data-role="guarded"]').addEventListener('change', (ev) => { state.guarded = ev.target.checked; render(); });
+    el.querySelector('[data-role="q"]').addEventListener('input', (ev) => { state.q = ev.target.value; render(); });
+    render();
+  }
+
+  // ---------- comparison page
+  const repoRef = (e) => !e || e.hidden ? esc(e ? e.name : '') : `<a href="#${esc(slug(e.name))}">${esc(e.name)}</a>`;
+  function renderCompare(e, c) {
+    const st = compareStatus(c);
+    const oldE = byName(c.old_report), newE = byName(c.new_report);
+    const api = c.api || {};
+    const ovNew = (c.overrides || {}).new || [];
+    const usage = c.usage || [];
+    const lp = c.local_patches || { changed: [], diffs: {} };
+    const parents = Object.entries(c.app_parents || {});
+    const files = c.files || { added: [], removed: [] };
+    let cmpTable = '';
+    if (oldE && newE) {
+      const a = analyse(latest(oldE)), b = analyse(latest(newE));
+      const row = (label, x, y) => `<tr><td>${label}</td><td class="num">${x}</td><td class="num">${y}</td></tr>`;
+      cmpTable = `<section><h3>${esc(T.cmpTable(target, oldE.name, newE.name))}</h3><p class="lead">${esc(T.cmpTableLead(target))}</p>
+        <div class="table-scroll"><table><thead><tr><th></th><th class="num">${repoRef(oldE)}</th><th class="num">${repoRef(newE)}</th></tr></thead><tbody>
+        ${row(pill('wajib'), a.counts.wajib, b.counts.wajib)}${row(pill('deprecated'), a.counts.deprecated, b.counts.deprecated)}${row(pill('perilaku'), a.counts.perilaku, b.counts.perilaku)}
+        ${row(esc(T.parseErrRow), a.lintErr, b.lintErr)}${row(esc(T.compileDepRow), a.lintDep, b.lintDep)}${row(esc(T.deadRow(target)), a.guarded.wajib + a.guarded.deprecated, b.guarded.wajib + b.guarded.deprecated)}
+        </tbody></table></div></section>`;
+    }
+    const diffHtml = (text) => `<pre class="diff">${esc(text).split('\n').map((l) => l.startsWith('+') && !l.startsWith('+++') ? `<span class="a">${l}</span>` : l.startsWith('-') && !l.startsWith('---') ? `<span class="d">${l}</span>` : l.startsWith('@@') ? `<span class="h">${l}</span>` : l).join('\n')}</pre>`;
+    const mc = api.methods_changed || [];
+    return `
+      <div class="page-head"><h2>${esc(e.name)}</h2><span class="pill ${st[0]}">${esc(st[1])}</span></div>
+      <p class="lead">${T.cmpLead(esc((c.old || {}).path), num((c.old || {}).files), esc((c.new || {}).path), num((c.new || {}).files), esc((c.app || {}).path))}</p>
+      ${c.summary ? `<div class="summary"><p>${esc(c.summary)}</p></div>` : ''}
+      <div class="stats">
+        <div class="stat ${ovNew.length ? 'wajib' : 'ok'}"><span class="v">${ovNew.length}</span><span class="k">${esc(T.overrideConflicts)}</span></div>
+        <div class="stat ${usage.length ? 'wajib' : 'ok'}"><span class="v">${usage.length}</span><span class="k">${esc(T.apiUsage)}</span></div>
+        <div class="stat deprecated"><span class="v">${(lp.changed || []).length}</span><span class="k">${esc(T.localPatched)}</span></div>
+        <div class="stat"><span class="v">${num(files.changed_count)}</span><span class="k">${esc(T.filesChanged(files.changed_count, (files.added || []).length, (files.removed || []).length))}</span></div>
+      </div>
+      ${(c.notes || []).length ? `<section><h3>${esc(T.analystNotes)}</h3>${notesHtml(c.notes)}</section>` : ''}
+      ${cmpTable}
+      <section><h3>${esc(T.localTitle)}</h3><p class="lead">${esc(T.localLead)}</p>
+        ${(lp.changed || []).length ? lp.changed.map((f) => `<details class="block"><summary class="mono">${esc(f)}</summary><div>${diffHtml((lp.diffs || {})[f] || '')}</div></details>`).join('') : `<p class="empty">${esc(T.noLocal)}</p>`}</section>
+      <section><h3>${esc(T.compatTitle)}</h3><p class="lead">${esc(T.compatLead)}</p>
+        ${ovNew.length ? `<div class="table-scroll"><table><thead><tr><th>${esc(T.level)}</th><th>${esc(T.member)}</th><th>${esc(T.problem)}</th><th>${esc(T.signature)}</th></tr></thead><tbody>${ovNew.map((o) => `<tr><td>${pill(o.level === 'fatal' ? 'wajib' : 'perilaku', o.level)}</td><td class="mono">${esc(o.class)}::${esc(o.member || '')}<div class="sub">${esc(o.file)}:${o.line}</div></td><td>${esc(o.problem)}</td><td><div class="sig new">${esc(o.child || '')}</div><div class="sig old">${esc(o.parent || '')}</div></td></tr>`).join('')}</tbody></table></div>` : `<p class="empty">${esc(T.noConflict)}</p>`}
+        ${parents.length ? `<p class="sub">${esc(T.perParent)} ${parents.map(([k, v]) => `<span class="tag mono">${esc(k)} × ${v}</span>`).join('')}</p>` : ''}</section>
+      <section><h3>${esc(T.usageTitle)}</h3>
+        ${usage.length ? `<div class="table-scroll"><table><thead><tr><th>${esc(T.loc)}</th><th>${esc(T.kind)}</th><th>${esc(T.api)}</th><th>${esc(T.call)}</th></tr></thead><tbody>${usage.map((u) => `<tr><td class="mono">${esc(u.file)}:${u.line}</td><td>${esc(u.kind)}</td><td class="mono">${esc(u.what)}</td><td class="mono">${esc(u.code)}</td></tr>`).join('')}</tbody></table></div>` : `<p class="empty">${esc(T.noUsage)}</p>`}</section>
+      ${(c.config || []).length ? `<section><h3>${esc(T.config)}</h3><div class="table-scroll"><table><thead><tr><th>${esc(T.cfgFile)}</th><th>${esc(T.cfgNew)}</th><th>${esc(T.cfgUnused)}</th></tr></thead><tbody>${c.config.map((x) => `<tr><td class="mono">${esc(x.file)}</td><td>${(x.new_keys || []).map((k) => `<span class="tag mono">${esc(k)}</span>`).join('') || '-'}</td><td>${(x.unused_keys || []).map((k) => `<span class="tag mono">${esc(k)}</span>`).join('') || '-'}</td></tr>`).join('')}</tbody></table></div></section>` : ''}
+      <details class="block"><summary>${esc(T.sigChanged(mc.length))}</summary><div><div class="table-scroll"><table><thead><tr><th>${esc(T.method)}</th><th>${esc(T.oldNew)}</th></tr></thead><tbody>
+        ${mc.map((m) => `<tr><td class="mono">${esc(m.class)}::${esc(m.method)}()${m.more_required ? ' ' + pill('perilaku', T.moreReq) : ''}${m.return_added ? ' ' + pill('perilaku', T.retAdded) : ''}</td><td><div class="sig old">${esc(m.old)}</div><div class="sig new">${esc(m.new)}</div></td></tr>`).join('')}
+      </tbody></table></div></div></details>
+      <details class="block"><summary>${esc(T.removedTitle)}</summary><div>
+        <p class="sub"><b>${esc(T.classes)}:</b> ${(api.classes_removed || []).map((x) => `<span class="tag mono">${esc(x.class)}</span>`).join('') || '-'}</p>
+        <p class="sub"><b>${esc(T.methods)}:</b> ${(api.methods_removed || []).map((x) => `<span class="tag mono">${esc(x.class)}::${esc(x.method)}()</span>`).join('') || '-'}</p>
+        <p class="sub"><b>${esc(T.functions)}:</b> ${(api.functions_removed || []).map((x) => `<span class="tag mono">${esc(x.function)}()</span>`).join('') || '-'}</p>
+        <p class="sub"><b>${esc(T.funcChanged)}:</b> ${(api.functions_changed || []).map((x) => `<span class="tag mono">${esc(x.old)} → ${esc(x.new)}</span>`).join('') || '-'}</p></div></details>
+      <details class="block"><summary>${esc(T.filesAddRem)}</summary><div>
+        <p class="sub"><b>${esc(T.addedL)}:</b> ${(files.added || []).map((f) => `<span class="tag mono">${esc(f)}</span>`).join('') || '-'}</p>
+        <p class="sub"><b>${esc(T.removedL)}:</b> ${(files.removed || []).map((f) => `<span class="tag mono">${esc(f)}</span>`).join('') || '-'}</p></div></details>`;
+  }
+
+  document.getElementById('footer').innerHTML = `<span>${esc(T.footer(DATA.redacted || 0))}</span><span class="sub">${esc(T.footerData)}</span>`;
+  show();
+})();
+</script>

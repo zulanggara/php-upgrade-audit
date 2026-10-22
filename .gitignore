@@ -1,0 +1,14 @@
+# Analysis tools are installed by scripts/setup.sh
+/tools/vendor/
+
+# Audit output never belongs in this repo (it can contain code from audited projects)
+/out/
+/store/
+*.audit-store/
+report.html
+
+# Local / OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp

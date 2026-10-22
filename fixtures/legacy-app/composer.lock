@@ -1,0 +1,14 @@
+{
+    "packages": [
+        {"name": "guzzlehttp/guzzle", "version": "6.3.3", "require": {"php": ">=5.5", "guzzlehttp/psr7": "^1.4"}, "time": "2018-04-22T15:46:56+00:00", "notification-url": "https://packagist.org/downloads/"},
+        {"name": "monolog/monolog", "version": "1.25.1", "require": {"php": ">=5.3.0"}, "time": "2019-09-06T13:49:17+00:00", "notification-url": "https://packagist.org/downloads/"},
+        {"name": "phpoffice/phpexcel", "version": "1.8.1", "require": {"php": ">=5.2.0", "ext-xml": "*", "ext-xmlwriter": "*"}, "time": "2015-05-01T07:00:55+00:00", "notification-url": "https://packagist.org/downloads/"},
+        {"name": "swiftmailer/swiftmailer", "version": "v5.4.12", "require": {"php": ">=5.3.3"}, "time": "2018-07-31T09:26:32+00:00", "notification-url": "https://packagist.org/downloads/"},
+        {"name": "firebase/php-jwt", "version": "v5.0.0", "require": {"php": ">=5.3.0"}, "time": "2017-06-27T22:17:23+00:00", "notification-url": "https://packagist.org/downloads/"},
+        {"name": "symfony/polyfill-mbstring", "version": "v1.12.0", "require": {"php": ">=5.3.3"}, "time": "2019-08-06T08:03:45+00:00", "notification-url": "https://packagist.org/downloads/"},
+        {"name": "acme/internal-sdk", "version": "1.2.0", "require": {"php": "^7.0"}, "time": "2020-01-01T00:00:00+00:00"}
+    ],
+    "packages-dev": [
+        {"name": "phpunit/phpunit", "version": "7.5.20", "require": {"php": "^7.1"}, "time": "2020-01-08T08:45:45+00:00", "notification-url": "https://packagist.org/downloads/"}
+    ]
+}
