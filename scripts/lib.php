@@ -95,6 +95,35 @@ function listPhpFiles(string $root, array $excludes): array
     return $out;
 }
 
+/**
+ * Replace local absolute paths (they reveal user names and folder layout) in every string of $data.
+ * $roots maps a known folder to the label shown instead, e.g. [store => '<store>'].
+ */
+function strip_local_paths(mixed $data, array $roots = []): mixed
+{
+    if (is_array($data)) {
+        foreach ($data as $k => $v) {
+            $data[$k] = strip_local_paths($v, $roots);
+        }
+        return $data;
+    }
+    if (!is_string($data) || !str_contains($data, '/')) {
+        return $data;
+    }
+    $roots += [dirname(__DIR__) => '<tool>', rtrim(sys_get_temp_dir(), '/') => '<tmp>'];
+    uksort($roots, fn ($a, $b) => strlen($b) <=> strlen($a)); // longest first
+    foreach ($roots as $path => $label) {
+        if ($path !== '' && $path !== '/') {
+            $data = str_replace(rtrim((string) $path, '/'), $label, $data);
+        }
+    }
+    return (string) preg_replace(
+        ['#(?<![\w.~-])/(?:private/)?var/folders/[^\s"\'<>]*?/T(?=/)#', '#(?<![\w.~-])(?:/Users|/home)/[^/\s"\'<>]+#', '#(?<![\w.~-])/root(?=/)#'],
+        ['<tmp>', '~', '~'],
+        $data
+    );
+}
+
 /** All tool output goes through here, so secrets are redacted before anything touches disk or stdout. */
 function writeJson(string $path, array $data): void
 {

@@ -95,6 +95,7 @@ $data = [
 
 $redacted = 0;
 $data = redact_data($data, $redacted);
+$data = strip_local_paths($data, [$store => '<store>']);
 $data['redacted'] = $redacted;
 
 $template = (string) file_get_contents(__DIR__ . '/../assets/report-template.html');

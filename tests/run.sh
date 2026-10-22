@@ -35,7 +35,8 @@ STORE="$TMP/store"
 php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$STORE" --name=legacy-app --skip=rector,phpcompat --offline 2>/dev/null >/dev/null
 FIRST="$(ls "$STORE/legacy-app/scans" | head -1)"
 SUM1="$(php -r 'echo md5_file($argv[1]);' "$STORE/legacy-app/scans/$FIRST/report.json")"
-echo '{"summary":"first review","notes":[{"sev":"info","title":"t","body":"b"}]}' > "$STORE/legacy-app/scans/$FIRST/notes.json"
+# Local paths in notes (and in tool stderr) must not reach the report
+echo "{\"summary\":\"first review\",\"notes\":[{\"sev\":\"info\",\"title\":\"t\",\"body\":\"see $DIR/tools/x.php and /home/someone/project/a.php and /Users/someone/w/b.php\"}]}" > "$STORE/legacy-app/scans/$FIRST/notes.json"
 sleep 1
 php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$STORE" --name=legacy-app --skip=rector,phpcompat --offline 2>/dev/null >/dev/null
 [ "$(ls "$STORE/legacy-app/scans" | wc -l | tr -d ' ')" = "2" ] || fail "expected 2 scan versions"
@@ -49,6 +50,7 @@ for lang in en id; do
   php "$DIR/scripts/render.php" --store="$STORE" --out="$TMP/report-$lang.html" --lang="$lang" --offline 2>/dev/null
   grep -q 'fonts.googleapis' "$TMP/report-$lang.html" && fail "offline report still loads web fonts"
   grep -q "$DIR" "$TMP/report-$lang.html" && fail "report contains a local absolute path"
+  grep -qE '/home/someone|/Users/someone' "$TMP/report-$lang.html" && fail "report contains a home folder path"
   if command -v node >/dev/null 2>&1; then
     sed -n '/^<script>$/,/^<\/script>$/p' "$TMP/report-$lang.html" | sed '1d;$d' > "$TMP/check.js"
     node --check "$TMP/check.js" || fail "report script does not parse ($lang)"
