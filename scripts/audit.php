@@ -27,7 +27,7 @@ if (str_starts_with($out . '/', $repo . '/')) {
     fwrite(STDERR, "The output folder must not be inside the audited repo.\n");
     exit(2);
 }
-$target = opt($argv, 'target', '8.5.12');
+$target = targetFrom($argv);
 $name = opt($argv, 'name', basename($repo));
 $skip = array_filter(explode(',', (string) opt($argv, 'skip', '')));
 $exclude = opt($argv, 'exclude');

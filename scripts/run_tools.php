@@ -19,8 +19,8 @@ if ($repo === '' || !is_dir($repo) || $outDir === null) {
 $repo = rtrim(realpath($repo), '/');
 @mkdir($outDir, 0700, true);
 $outDir = realpath($outDir);
-$target = opt($argv, 'target', '8.5.12');
-$minor = implode('.', array_slice(explode('.', $target), 0, 2));
+$target = targetFrom($argv);
+$minor = targetMinor($target);
 $only = opt($argv, 'only');
 $excludes = excludesFrom($argv);
 $bin = realpath(__DIR__ . '/../tools/vendor/bin');

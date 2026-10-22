@@ -17,6 +17,14 @@ for rule in P80-CURLY-OFFSET P80-REMOVED-FUNC P80-PHP4-CTOR P80-CONCAT-PRECEDENC
 done
 echo "scanner: ok"
 
+# Scanner with an older target: rules introduced after the target must not be reported
+php "$DIR/scripts/scan_code.php" "$DIR/fixtures/legacy-app" --target=8.3.30 > "$TMP/scan83.json"
+grep -q '"rule": "P80-' "$TMP/scan83.json" || fail "target 8.3: PHP 8.0 rules no longer fire"
+for rule in P84-IMPLICIT-NULLABLE P84-CSV-ESCAPE P85-BACKTICK P85-CAST-NAME P85-CASE-SEMICOLON P85-FREE-FUNC; do
+  grep -q "\"rule\": \"$rule\"" "$TMP/scan83.json" && fail "target 8.3: $rule (introduced after 8.3) was reported"
+done
+echo "scanner target: ok"
+
 # Lint must report the curly-offset parse error
 php "$DIR/scripts/lint.php" "$DIR/fixtures/legacy-app" > "$TMP/lint.json"
 grep -q '"Parse error"' "$TMP/lint.json" || fail "lint did not report the parse error"

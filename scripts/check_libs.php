@@ -31,19 +31,17 @@ if ($repo === '' || !is_dir($repo)) {
     fwrite(STDERR, "Usage: php check_libs.php <repo> [--target=8.5.12] [--cache=<dir>] [--offline]\n");
     exit(2);
 }
-$target = '8.5.12';
+$target = targetFrom($argv);
 $cacheDir = sys_get_temp_dir() . '/php-upgrade-audit-packagist';
 $offline = false;
 foreach (array_slice($argv, 2) as $arg) {
-    if (str_starts_with($arg, '--target=')) {
-        $target = substr($arg, 9);
-    } elseif (str_starts_with($arg, '--cache=')) {
+    if (str_starts_with($arg, '--cache=')) {
         $cacheDir = substr($arg, 8);
     } elseif ($arg === '--offline') {
         $offline = true;
     }
 }
-$targetMinor = implode('.', array_slice(explode('.', $target), 0, 2));
+$targetMinor = targetMinor($target);
 $out = ['tool' => 'check_libs', 'target' => $target, 'composer' => false, 'root' => null, 'packages' => [], 'extensions' => [], 'errors' => []];
 
 $jsonPath = "$repo/composer.json";
@@ -148,7 +146,8 @@ foreach ($exts as $ext => $by) {
     $out['extensions'][] = [
         'name' => $ext,
         'required_by' => array_values(array_unique($by)),
-        'removed_in' => REMOVED_EXT[strtolower($ext)] ?? null,
+        // Only extensions already gone in the target version (imap is fine on a move to 8.3, gone in 8.4).
+        'removed_in' => isset(REMOVED_EXT[strtolower($ext)]) && appliesTo(REMOVED_EXT[strtolower($ext)], $target) ? REMOVED_EXT[strtolower($ext)] : null,
         'loaded_locally' => extension_loaded($ext),
     ];
 }

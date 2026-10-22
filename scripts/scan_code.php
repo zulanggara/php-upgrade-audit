@@ -2,7 +2,7 @@
 /**
  * Tokenizer-based PHP 7.x -> 8.5 compatibility scanner. Read-only: it only reads files, never runs them.
  *
- * Usage: php scan_code.php <repo> [--exclude=dir1,dir2] > scan.json
+ * Usage: php scan_code.php <repo> [--target=8.5.12] [--exclude=dir1,dir2] > scan.json
  */
 declare(strict_types=1);
 
@@ -19,9 +19,12 @@ if ($repo === '' || !is_dir($repo)) {
 $repo = rtrim(realpath($repo), '/');
 $excludes = excludesFrom($argv);
 
-$rules = require __DIR__ . '/rules.php';
+$target = targetFrom($argv);
+// Only changes that exist in the target version: a rule added in 8.5 says nothing about a move to 8.3.
+$allRules = require __DIR__ . '/rules.php';
+$rules = array_values(array_filter($allRules, fn ($r) => appliesTo($r['ver'], $target)));
 $scanner = new Scanner($rules);
-Scanner::$target = opt($argv, 'target', '8.5.12');
+Scanner::$target = $target;
 [$maj, $min, $pat] = array_map('intval', array_pad(explode('.', Scanner::$target), 3, 0));
 Scanner::$targetId = $maj * 10000 + $min * 100 + $pat;
 $files = listPhpFiles($repo, $excludes);
@@ -46,6 +49,8 @@ printJson([
     'files_scanned' => count($files) - count($skipped),
     'files_skipped' => $skipped,
     'excludes' => $excludes,
+    'target' => $target,
+    'rules_above_target' => count($allRules) - count($rules),
     'findings' => $scanner->findings,
     'rules' => $meta,
 ]);
