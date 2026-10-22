@@ -21,12 +21,14 @@ if ($repo === '' || !is_dir($repo) || $out === null) {
     exit(2);
 }
 $repo = rtrim(realpath($repo), '/');
-@mkdir($out, 0700, true);
-$out = realpath($out);
+$out = absPath($out);
+// Checked before anything is created: the audited repo is never written to, not even an empty folder.
 if (str_starts_with($out . '/', $repo . '/')) {
     fwrite(STDERR, "The output folder must not be inside the audited repo.\n");
     exit(2);
 }
+@mkdir($out, 0700, true);
+$out = realpath($out);
 $target = targetFrom($argv);
 $name = opt($argv, 'name', basename($repo));
 $skip = array_filter(explode(',', (string) opt($argv, 'skip', '')));

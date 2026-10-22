@@ -57,4 +57,9 @@ for lang in en id; do
   fi
 done
 echo "render: ok"
+
+# An output folder inside the repo is refused before anything is created there
+php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$DIR/fixtures/legacy-app/out" > /dev/null 2>&1 && fail "output inside the repo was accepted"
+[ -d "$DIR/fixtures/legacy-app/out" ] && { rm -rf "$DIR/fixtures/legacy-app/out"; fail "audit created a folder inside the repo"; }
+echo "read-only repo: ok"
 echo "all tests passed"

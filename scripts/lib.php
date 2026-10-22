@@ -24,6 +24,30 @@ function opt(array $argv, string $name, ?string $default = null): ?string
     return $default;
 }
 
+/** Absolute, normalised path of $path without creating it (the nearest existing parent is resolved). */
+function absPath(string $path): string
+{
+    if (str_starts_with($path, '~/')) {
+        $path = rtrim((string) getenv('HOME'), '/') . substr($path, 1);
+    }
+    if (!str_starts_with($path, '/')) {
+        $path = getcwd() . '/' . $path;
+    }
+    $parts = [];
+    foreach (explode('/', $path) as $p) {
+        if ($p === '' || $p === '.') {
+            continue;
+        }
+        $p === '..' ? array_pop($parts) : $parts[] = $p;
+    }
+    $rest = [];
+    while ($parts !== [] && !file_exists('/' . implode('/', $parts))) {
+        array_unshift($rest, array_pop($parts));
+    }
+    $base = rtrim((string) realpath('/' . implode('/', $parts)), '/');
+    return $base . ($rest === [] ? '' : '/' . implode('/', $rest));
+}
+
 /** --target as a full version (x.y or x.y.z); "latest" or no value means LATEST_TARGET. */
 function targetFrom(array $argv): string
 {
