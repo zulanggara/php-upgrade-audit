@@ -10,8 +10,9 @@ rule id). One entry is one kind of problem. Required fields: `id`, `sev`, `ver`,
   (`kind => special`) live in `scripts/scan_code.php` (`check` is the name passed to `special()`).
 - Be honest with `conf`. Generic method names (`->attach(`) and heuristics are always `rendah` (low) or
   `sedang` (medium).
-- Add the English title and fix to `rules_en.php`. `tests/run.sh` does not check this, so run:
-  `php -r '$r=array_column(require "scripts/rules.php","id"); $e=array_keys(require "scripts/rules_en.php"); var_dump(array_diff($r,$e));'`
+- Add the English title and fix to `rules_en.php`; `tests/run.sh` fails when a rule has no translation.
+- `ver` is the PHP version that introduced the change (e.g. `8.4`, or `8.0/8.4` when it was extended later).
+  The scanner skips rules newer than `--target`, starting from the earliest version named.
 
 After changing rules:
 

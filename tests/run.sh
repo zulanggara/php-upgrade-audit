@@ -17,6 +17,17 @@ for rule in P80-CURLY-OFFSET P80-REMOVED-FUNC P80-PHP4-CTOR P80-CONCAT-PRECEDENC
 done
 echo "scanner: ok"
 
+# Every rule has an English title and fix
+php -r '
+$ids = array_column(require $argv[1], "id");
+$en = require $argv[2];
+$missing = array_diff($ids, array_keys($en));
+$extra = array_diff(array_keys($en), $ids);
+foreach ($en as $id => $t) { if (!is_array($t) || count($t) !== 2 || trim($t[0]) === "" || trim($t[1]) === "") $missing[] = "$id (incomplete)"; }
+if ($missing || $extra) { fwrite(STDERR, "missing: " . implode(", ", $missing) . "; unknown: " . implode(", ", $extra) . "\n"); exit(1); }
+' "$DIR/scripts/rules.php" "$DIR/scripts/rules_en.php" || fail "rules_en.php does not match rules.php"
+echo "translations: ok"
+
 # Scanner with an older target: rules introduced after the target must not be reported
 php "$DIR/scripts/scan_code.php" "$DIR/fixtures/legacy-app" --target=8.3.30 > "$TMP/scan83.json"
 grep -q '"rule": "P80-' "$TMP/scan83.json" || fail "target 8.3: PHP 8.0 rules no longer fire"
@@ -76,6 +87,38 @@ for lang in en id; do
   fi
 done
 echo "render: ok"
+
+# Redaction end to end: a token in notes (summary, body, code) never reaches the HTML
+TOKEN="gh""p_$(printf 'Z9y8%.0s' 1 2 3 4 5 6 7 8 9)"
+PASSWD="hunter2-$(date +%s)"
+RSTORE="$TMP/redact-store"
+cp -r "$STORE" "$RSTORE"
+LAST="$(ls "$RSTORE/legacy-app/scans" | tail -1)"
+cat > "$RSTORE/legacy-app/scans/$LAST/notes.json" <<JSON
+{"summary":"Token $TOKEN was found in composer.json.",
+ "notes":[{"sev":"wajib","title":"Credentials","body":"Remove https://$TOKEN@github.com/acme/x.git",
+  "code":[{"where":"config.php:3","before":"\$db['password'] = '$PASSWD';","after":"\$db['password'] = getenv('DB_PASSWORD');"}]}]}
+JSON
+php "$DIR/scripts/render.php" --store="$RSTORE" --out="$TMP/redact.html" --offline 2> "$TMP/redact.log"
+grep -q "$TOKEN" "$TMP/redact.html" && fail "a token from notes.json reached the report"
+grep -q "$PASSWD" "$TMP/redact.html" && fail "a password from a code sample reached the report"
+grep -q 'REDACTED' "$TMP/redact.html" || fail "nothing was redacted"
+grep -qE '[1-9][0-9]* value\(s\) redacted' "$TMP/redact.log" || fail "render log does not report the redactions"
+echo "redaction end to end: ok"
+
+# Robustness: a repo without composer.json, and one with a minified file, do not crash any step
+mkdir -p "$TMP/nocomposer" "$TMP/minified"
+printf '<?php\nfunction f($a) { return each($a); }\n' > "$TMP/nocomposer/a.php"
+php -r 'echo "<?php "; for ($i = 0; $i < 300; $i++) echo "function f$i(\$a){return \$a{0}.mysql_query(\"x\");} "; echo "\n";' > "$TMP/minified/min.php"
+for r in nocomposer minified; do
+  php "$DIR/scripts/audit.php" "$TMP/$r" --out="$TMP/robust" --name=$r --skip=rector --offline > /dev/null 2> "$TMP/robust-$r.log" || fail "audit.php crashed on $r: $(tail -3 "$TMP/robust-$r.log")"
+  grep -qiE 'fatal|failed \(exit' "$TMP/robust-$r.log" && fail "a step failed on $r: $(grep -iE 'fatal|failed' "$TMP/robust-$r.log" | head -2)"
+done
+grep -q '"composer": false' "$TMP/robust"/nocomposer/scans/*/libs.json || fail "no-composer repo: libs.json should say composer false"
+grep -q 'min.php' "$TMP/robust"/minified/scans/*/profile.json || fail "minified file not detected"
+[ "$(grep -c '"rule": "EXT-MYSQL"' "$TMP/robust"/minified/scans/*/scan.json)" -ge 300 ] || fail "findings on one minified line were deduplicated away"
+php "$DIR/scripts/render.php" --store="$TMP/robust" --out="$TMP/robust.html" --offline 2> /dev/null || fail "render failed on the robustness store"
+echo "robustness: ok"
 
 # Notes validator: the carried-over notes of the second scan are flagged, a good file passes, a bad one fails
 set +e
