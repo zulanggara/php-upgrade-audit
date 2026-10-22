@@ -132,9 +132,12 @@ if (opt($argv, 'load-classes') !== null) {
 }
 
 $report = ['schema' => 2, 'name' => $name, 'scan_id' => $id, 'target' => $target, 'generated_at' => date('c'), 'php_runtime' => $phpVersion];
+$report['timings'] = [];
 foreach ($steps as $key => [$script, $args]) {
     fwrite(STDERR, "[$name] $key...\n");
+    $t0 = microtime(true);
     [$code, $stdout, $stderr] = runScript($script, $args);
+    $report['timings'][$key] = round(microtime(true) - $t0, 2);
     $data = json_decode($stdout, true);
     if (!is_array($data)) {
         $data = ['error' => "Failed to run $script (exit $code)", 'stderr' => substr($stderr, 0, 2000)];
@@ -146,8 +149,10 @@ foreach ($steps as $key => [$script, $args]) {
 
 foreach (array_values(array_diff(['phpcompat', 'rector'], $skip)) as $tool) {
     fwrite(STDERR, "[$name] $tool...\n");
+    $t0 = microtime(true);
     runScript('run_tools.php', [$repo, "--out=$dir", '--memory=' . opt($argv, 'memory', '2G'), "--cache=$out/.cache/rector-" . entity_slug($name), "--target=$target", "--only=$tool", ...$common]);
     $report[$tool] = json_decode((string) @file_get_contents("$dir/$tool.json"), true) ?? ['error' => "Failed to run $tool"];
+    $report['timings'][$tool] = round(microtime(true) - $t0, 2);
     if (!empty($report[$tool]['hint'])) {
         fwrite(STDERR, "[$name] $tool: {$report[$tool]['hint']}\n");
     }

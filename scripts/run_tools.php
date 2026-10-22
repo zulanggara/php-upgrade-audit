@@ -70,6 +70,7 @@ if ($only === null || $only === 'phpcompat') {
         'ok' => is_array($raw),
         'stderr' => $raw === null ? substr($stderr . $stdout, 0, 2000) : null,
         'totals' => $raw['totals'] ?? null,
+        'peak_memory_mb' => peakChildMemoryMb(),
         'messages' => $messages,
     ]);
 }
@@ -113,10 +114,18 @@ if ($only === null || $only === 'rector') {
         'stderr' => $raw === null ? substr($stderr . $stdout, 0, 2000) : null,
         'hint' => $raw === null && str_contains($stderr . $stdout, 'Allowed memory size') ? "Rector ran out of memory ($memory). Re-run audit.php with --memory=4G (or more), or --skip=rector." : null,
         'changed_files' => $raw['totals']['changed_files'] ?? count($files),
+        'peak_memory_mb' => peakChildMemoryMb(),
         'errors' => array_map(fn ($e) => ['file' => isset($e['file']) ? str_replace($repo . '/', '', $e['file']) : null, 'message' => $e['message'] ?? ''], $raw['errors'] ?? []),
         'by_rule' => $byRule,
         'files' => $files,
     ]);
+}
+
+/** Peak resident memory of the tool processes run so far (audit.php runs one tool per call), in MB. */
+function peakChildMemoryMb(): ?int
+{
+    $kb = getrusage(1)['ru_maxrss'] ?? null; // RUSAGE_CHILDREN; kilobytes on Linux, bytes on macOS
+    return $kb === null ? null : (int) round(PHP_OS_FAMILY === 'Darwin' ? $kb / 1048576 : $kb / 1024);
 }
 
 /** Run a process with the output folder as cwd; returns [exit code, stdout, stderr]. */
