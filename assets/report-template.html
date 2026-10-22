@@ -228,6 +228,10 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       showGuarded: (t) => `show code that does not run on ${t}`, search: 'Search file or issue', noFindings: 'No findings for this filter.',
       level: 'Level', since: 'Since', issue: 'Issue and fix', count: 'Count', confidence: 'Confidence', files: 'file(s)', guardedBy: 'Guarded by', showMore: (n) => `Show ${n} more`, yes: 'yes', avail: 'available',
       guard: { mati: 'not run on the target version', jalan: 'runs on the target version', '?': 'condition could not be evaluated' },
+      rtSum: (p, l, u, f, x, d) => `Runtime proof on PHP ${p} (class loading): ${l} of ${u} loaded, ${f} failed, ${x} unresolved, ${d} deprecation(s)`,
+      rtMode: { composer: 'Composer autoload in a scratch copy', files: 'files that only declare classes or functions (no Composer)' },
+      rtFailed: 'Fail to load on this PHP', rtUnresolved: 'Need code that is not in the repo or not installed (not a PHP problem by itself)', rtDeps: 'Deprecations while linking classes',
+      rtSkipped: (n) => `${n} file(s) not loaded because they run code when included`, rtPlatform: 'composer.lock does not install on the target PHP without ignoring its php requirement', rtUnit: 'Class / file', rtMissing: 'Missing', rtWhere: 'Where', rtNothing: 'Nothing to load.',
       lintSum: (p, e, d, f) => `Proof from PHP ${p} (php -l): ${e} error(s), ${d} deprecation(s) in ${f} files`, lintFail: 'Lint failed to run.', noLintErr: 'No parse or fatal errors.', parseErr: 'Parse / fatal errors', compileDep: 'Compile-time deprecations',
       pcSum: (v, n, k) => `PHPCompatibility (testVersion ${v}): ${n} message(s), ${k} kind(s)`, pcFail: 'PHPCompatibility: failed to run', sniff: 'Sniff', type: 'Type', example: 'Example', noMsg: 'No messages.',
       rcSum: (s, n) => `Rector ${s} (dry-run): ${n} file(s) can be changed automatically`, rcFail: 'Rector: failed to run', rcNote: 'This set also contains optional modernisation, e.g. array() to []. Not every change is required for compatibility.', rcRule: 'Rector rule', noChange: 'No changes.',
@@ -270,6 +274,10 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       showGuarded: (t) => `tampilkan kode yang tidak dijalankan di ${t}`, search: 'Cari file atau masalah', noFindings: 'Tidak ada temuan untuk filter ini.',
       level: 'Tingkat', since: 'Sejak', issue: 'Masalah dan perbaikan', count: 'Jumlah', confidence: 'Keyakinan', files: 'file', guardedBy: 'Dijaga', showMore: (n) => `Tampilkan ${n} lagi`, yes: 'ya', avail: 'tersedia',
       guard: { mati: 'tidak dijalankan di versi target', jalan: 'dijalankan di versi target', '?': 'kondisi tidak bisa dievaluasi' },
+      rtSum: (p, l, u, f, x, d) => `Bukti runtime di PHP ${p} (memuat class): ${l} dari ${u} termuat, ${f} gagal, ${x} belum terselesaikan, ${d} deprecation`,
+      rtMode: { composer: 'autoload Composer di salinan sementara', files: 'file yang hanya mendeklarasikan class atau fungsi (tanpa Composer)' },
+      rtFailed: 'Gagal dimuat di PHP ini', rtUnresolved: 'Butuh kode yang tidak ada di repo atau belum terpasang (bukan masalah PHP dengan sendirinya)', rtDeps: 'Deprecation saat class di-link',
+      rtSkipped: (n) => `${n} file tidak dimuat karena menjalankan kode saat di-include`, rtPlatform: 'composer.lock tidak bisa dipasang di PHP target tanpa mengabaikan syarat php-nya', rtUnit: 'Class / file', rtMissing: 'Yang hilang', rtWhere: 'Lokasi', rtNothing: 'Tidak ada yang dimuat.',
       lintSum: (p, e, d, f) => `Bukti dari PHP ${p} (php -l): ${e} error, ${d} deprecation dari ${f} file`, lintFail: 'Lint gagal dijalankan.', noLintErr: 'Tidak ada parse error atau fatal error.', parseErr: 'Parse / fatal error', compileDep: 'Deprecation saat kompilasi',
       pcSum: (v, n, k) => `PHPCompatibility (testVersion ${v}): ${n} pesan, ${k} jenis`, pcFail: 'PHPCompatibility: gagal dijalankan', sniff: 'Sniff', type: 'Tipe', example: 'Contoh', noMsg: 'Tidak ada pesan.',
       rcSum: (s, n) => `Rector ${s} (dry-run): ${n} file bisa diubah otomatis`, rcFail: 'Rector: gagal dijalankan', rcNote: 'Set ini juga berisi modernisasi opsional, misalnya array() menjadi []. Tidak semua perubahan wajib untuk kompatibilitas.', rcRule: 'Aturan Rector', noChange: 'Tidak ada perubahan.',
@@ -322,8 +330,9 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
     const lintErr = ((r.lint || {}).errors || []).length;
     const lintDep = ((r.lint || {}).deprecations || []).length;
     const removedExt = ((r.libs || {}).extensions || []).filter((e) => e.removed_in).length;
+    const loadFail = ((r.runtime || {}).failed || []).length;
     let status = ['s-ok', T.autoStatus.ok];
-    if (counts.wajib || lintErr || libs['tidak-didukung'] || removedExt) status = ['s-wajib', T.autoStatus.must];
+    if (counts.wajib || lintErr || libs['tidak-didukung'] || removedExt || loadFail) status = ['s-wajib', T.autoStatus.must];
     else if (counts.deprecated || counts.perilaku || libs['perlu-upgrade'] || libs['cek-manual'] || lintDep) status = ['s-deprecated', T.autoStatus.dep];
     if (r.status && r.status.label) status = [LEVEL_CLASS[r.status.level] || 's-info', r.status.label];
     return { counts, guarded, libs, lintErr, lintDep, status };
@@ -567,7 +576,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
         </div>
         <div class="table-scroll"><table data-role="findings"></table></div>
       </section>
-      ${lintHtml(r.lint)}${phpcompatHtml(r.phpcompat)}${rectorHtml(r.rector)}`;
+      ${lintHtml(r.lint)}${runtimeHtml(r.runtime)}${phpcompatHtml(r.phpcompat)}${rectorHtml(r.rector)}`;
   }
 
   function libRootHtml(libs) {
@@ -610,6 +619,21 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
     return `<details class="block"${errs.length ? ' open' : ''}><summary>${esc(T.lintSum(lint.php, errs.length, deps.length, num(lint.files_linted)))}</summary><div>
       ${errs.length ? `<h3>${esc(T.parseErr)}</h3>${list(errs)}` : `<p class="empty">${esc(T.noLintErr)}</p>`}
       ${deps.length ? `<h3>${esc(T.compileDep)}</h3>${list(deps.slice(0, 500))}` : ''}</div></details>`;
+  }
+  function runtimeHtml(rt) {
+    if (!rt || rt.error) return rt && rt.error ? `<details class="block"><summary>${esc(T.rtSum('?', 0, 0, 0, 0, 0))}</summary><div><p class="sub">${esc(rt.error)}</p></div></details>` : '';
+    const failed = rt.failed || [], unres = rt.unresolved || [], deps = rt.deprecations || [];
+    const mode = (T.rtMode[rt.mode] || rt.mode || '');
+    const rows = (items, extra) => `<div class="table-scroll"><table><thead><tr><th>${esc(T.rtUnit)}</th><th>${esc(extra ? T.rtMissing : T.type)}</th><th>${esc(T.rtWhere)}</th></tr></thead><tbody>` +
+      items.slice(0, 300).map((x) => `<tr><td class="mono">${esc(x.unit)}</td><td>${extra ? `<span class="mono">${esc(x.missing)}</span>` : esc(x.type)}</td><td><span class="mono">${esc(x.where || x.file || '')}</span><div class="sub">${esc(x.message)}</div></td></tr>`).join('') + '</tbody></table></div>';
+    return `<details class="block"${failed.length ? ' open' : ''}><summary>${esc(T.rtSum(rt.php, rt.loaded, rt.units, failed.length, unres.length, deps.length))}</summary><div>
+      <p class="sub">${esc(mode)}${rt.install && rt.install.platform_php_ignored ? ' · ' + pill('wajib', T.rtPlatform) : ''}</p>
+      ${(rt.notes || []).map((n) => `<p class="sub">${esc(n)}</p>`).join('')}
+      ${failed.length ? `<h3>${esc(T.rtFailed)}</h3>${rows(failed, false)}` : ''}
+      ${deps.length ? `<h3>${esc(T.rtDeps)}</h3><ul class="hits">${deps.slice(0, 300).map((x) => `<li><span class="loc">${esc(x.where)} · ×${x.count}</span><code>${esc(x.message)}</code></li>`).join('')}</ul>` : ''}
+      ${unres.length ? `<h3>${esc(T.rtUnresolved)}</h3>${rows(unres, true)}` : ''}
+      ${(rt.skipped || []).length ? `<p class="sub">${esc(T.rtSkipped(rt.skipped.length))}</p>` : ''}
+      ${!rt.units ? `<p class="empty">${esc(T.rtNothing)}</p>` : ''}</div></details>`;
   }
   function phpcompatHtml(pc) {
     if (!pc) return '';

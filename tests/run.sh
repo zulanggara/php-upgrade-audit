@@ -132,6 +132,32 @@ php "$DIR/scripts/compare_framework.php" "${CMP[@]}" --store="$STORE" --name="Fr
 [ "$(ls "$STORE/framework-merge/scans" | wc -l | tr -d ' ')" = "2" ] || fail "second comparison did not add a version"
 echo "compare framework: ok"
 
+# Runtime proof: classes load in a scratch copy; the PHP 8 signature conflict fails, the rest is classified
+if command -v composer > /dev/null 2>&1; then
+  php "$DIR/scripts/load_classes.php" "$DIR/fixtures/composer-app" --work="$TMP/work" > "$TMP/rt.json" 2> "$TMP/rt.err" || fail "load_classes.php failed: $(tail -3 "$TMP/rt.err")"
+  php -r '
+  $d = json_decode(file_get_contents($argv[1]), true);
+  $ok = $d["mode"] === "composer" && array_column($d["failed"], "type", "unit") === ["App\\Model\\Report" => "signature"]
+     && array_column($d["unresolved"], "missing") === ["Vendor\\Sdk\\BasePlugin"]
+     && str_contains($d["deprecations"][0]["message"] ?? "", "Counter::count()") && $d["loaded"] === 3;
+  if (!$ok) { fwrite(STDERR, json_encode($d, JSON_PRETTY_PRINT)); exit(1); }' "$TMP/rt.json" || fail "composer mode did not classify the fixture classes"
+  [ -d "$DIR/fixtures/composer-app/vendor" ] && fail "load_classes.php installed into the audited repo"
+  echo "load classes (composer): ok"
+else
+  echo "load classes (composer): skipped (composer not installed)"
+fi
+php "$DIR/scripts/load_classes.php" "$DIR/fixtures/plain-app" --work="$TMP/work" > "$TMP/rt-files.json"
+php -r '
+$d = json_decode(file_get_contents($argv[1]), true);
+$skipped = array_column($d["skipped"], "file"); sort($skipped);
+$ok = $d["mode"] === "files" && $skipped === ["index.php", "plugin.php"]
+   && array_column($d["failed"], "type", "unit") === ["includes/class-widget.php" => "signature"]
+   && array_column($d["unresolved"], "missing") === ["WP_REST_Controller"] && $d["loaded"] === 2;
+if (!$ok) { fwrite(STDERR, json_encode($d, JSON_PRETTY_PRINT)); exit(1); }' "$TMP/rt-files.json" || fail "files mode did not classify the fixture files"
+php "$DIR/scripts/audit.php" "$DIR/fixtures/plain-app" --out="$TMP/rtstore" --skip=rector,phpcompat,libs --offline --load-classes > /dev/null 2>&1
+grep -q '"tool": "load_classes"' "$TMP/rtstore"/plain-app/scans/*/report.json || fail "audit.php --load-classes did not store the runtime proof"
+echo "load classes (files): ok"
+
 # First run: --help everywhere, exit codes, --fail-on, PHP version warning
 for s in audit scan_code lint check_libs run_tools detect compare_framework render validate_notes load_classes; do
   [ -f "$DIR/scripts/$s.php" ] || continue

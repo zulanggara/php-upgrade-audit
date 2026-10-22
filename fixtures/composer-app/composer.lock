@@ -1,0 +1,14 @@
+{
+    "_readme": ["Fixture lock file without packages."],
+    "content-hash": "00000000000000000000000000000000",
+    "packages": [],
+    "packages-dev": [],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "stability-flags": {},
+    "prefer-stable": false,
+    "prefer-lowest": false,
+    "platform": {"php": ">=7.2"},
+    "platform-dev": {},
+    "plugin-api-version": "2.6.0"
+}
