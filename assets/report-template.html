@@ -241,7 +241,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       config: 'Config', cfgFile: 'File', cfgNew: 'New keys in the new version (not in the app)', cfgUnused: 'App keys no longer read',
       sigChanged: (n) => `Changed method signatures (${n})`, method: 'Method', oldNew: 'Old → new', moreReq: 'more required args', retAdded: 'new return type',
       removedTitle: 'Removed methods, classes and functions', classes: 'Classes', methods: 'Methods', functions: 'Functions', funcChanged: 'Changed functions', filesAddRem: 'Files added / removed', addedL: 'Added', removedL: 'Removed',
-      footer: (n) => `Read-only report: no file in the audited repos was changed. ${n} sensitive value(s) were redacted.`, footerData: 'Raw data per scan lives in the history store: <entity>/scans/<scan-id>/.'
+      footer: (n) => `Read-only report: no file in the audited repos was changed. ${n ? n + ' sensitive value(s) were redacted.' : 'No sensitive values were found to redact.'}`, footerData: 'Every scan is kept in the local history store (one folder per scan), so earlier versions stay available in the version selector.'
     },
     id: {
       menu: 'Buka menu', menuLabel: 'Menu laporan', grpReport: 'Laporan', grpRepos: 'Repo', grpCompare: 'Perbandingan', overview: 'Ringkasan',
@@ -283,7 +283,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       config: 'Config', cfgFile: 'File', cfgNew: 'Key baru di versi baru (belum ada di aplikasi)', cfgUnused: 'Key aplikasi yang tidak dibaca lagi',
       sigChanged: (n) => `Signature method yang berubah (${n})`, method: 'Method', oldNew: 'Lama → baru', moreReq: 'argumen wajib bertambah', retAdded: 'return type baru',
       removedTitle: 'Method, class, dan fungsi yang dihapus', classes: 'Class', methods: 'Method', functions: 'Fungsi', funcChanged: 'Fungsi berubah', filesAddRem: 'File ditambah/dihapus', addedL: 'Baru', removedL: 'Dihapus',
-      footer: (n) => `Laporan read-only: tidak ada file di repo yang diaudit yang diubah. ${n} nilai sensitif disensor.`, footerData: 'Data mentah per scan ada di history store: <entitas>/scans/<scan-id>/.'
+      footer: (n) => `Laporan read-only: tidak ada file di repo yang diaudit yang diubah. ${n ? n + ' nilai sensitif disensor.' : 'Tidak ada nilai sensitif yang perlu disensor.'}`, footerData: 'Setiap scan disimpan di history store lokal (satu folder per scan), jadi versi sebelumnya tetap bisa dibuka lewat pemilih versi.'
     }
   };
   const T = I18N[LANG];

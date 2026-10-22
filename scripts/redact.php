@@ -24,7 +24,7 @@ function redact_text(string $s, int &$count = 0): string
         // Private key blocks (complete or cut off in a snippet)
         '/-----BEGIN ([A-Z ]*)PRIVATE KEY-----.*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/s' => '-----BEGIN $1PRIVATE KEY----- ' . REDACTED . ' -----END PRIVATE KEY-----',
         // Well-known token formats (prefix kept so the reader knows what it was)
-        '/\b(gh[pousr])_[A-Za-z0-9]{20,}/' => '$1_' . REDACTED,
+        '/\b(gh[pousr])_(?!•)[A-Za-z0-9]{20,}/' => '$1_' . REDACTED,
         '/\bgithub_pat_[A-Za-z0-9_]{20,}/' => 'github_pat_' . REDACTED,
         '/\bglpat-[A-Za-z0-9_-]{16,}/' => 'glpat-' . REDACTED,
         '/\bxox[abprs]-[A-Za-z0-9-]{10,}/' => 'xox-' . REDACTED,
@@ -34,7 +34,8 @@ function redact_text(string $s, int &$count = 0): string
         '/\bSG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}/' => 'SG.' . REDACTED,
         '/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/' => 'eyJ' . REDACTED,
         // Credentials inside URLs: scheme://user:pass@host or scheme://token@host
-        '#\b([a-z][a-z0-9+.-]*://)[^/\s:@\'"<>]+(?::[^@\s/\'"<>]*)?@#i' => '$1' . REDACTED . '@',
+        // (skipped when the value is already a placeholder such as ghp_•••••• or «REDACTED»)
+        '#\b([a-z][a-z0-9+.-]*://)(?![^/\s@]*(?:•|«))[^/\s:@\'"<>]+(?::[^@\s/\'"<>]*)?@#i' => '$1' . REDACTED . '@',
         // Authorization headers
         '/(Authorization\s*["\']?\s*[:=]\s*["\']?\s*(?:Bearer|Basic|Token)\s+)[A-Za-z0-9._~+\/=-]{8,}/i' => '$1' . REDACTED,
         // 'password' => 'value'   /   "token": "value"

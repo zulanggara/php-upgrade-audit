@@ -43,6 +43,8 @@ $mustKeep = [
     "PasswordEncoder::encode('') returns a different value",
     "token == \$expected",
     "Password: see the note below",
+    "\"url\": \"https://ghp_••••••@github.com/acme/lib.git\"",
+    "COMPOSER_AUTH='{\"github-oauth\":{\"github.com\":\"ghp_••••••\"}}'",
 ];
 
 $fail = 0;
