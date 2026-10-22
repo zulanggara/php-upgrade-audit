@@ -218,14 +218,23 @@ if command -v composer > /dev/null 2>&1; then
 else
   echo "load classes (composer): skipped (composer not installed)"
 fi
-php "$DIR/scripts/load_classes.php" "$DIR/fixtures/plain-app" --work="$TMP/work" > "$TMP/rt-files.json"
-php -r '
+CHECK_FILES='
 $d = json_decode(file_get_contents($argv[1]), true);
 $skipped = array_column($d["skipped"], "file"); sort($skipped);
-$ok = $d["mode"] === "files" && $skipped === ["index.php", "plugin.php"]
+$ok = $d["mode"] === $argv[2] && $skipped === ["index.php", "plugin.php", "tests/stubs.php"]
    && array_column($d["failed"], "type", "unit") === ["includes/class-widget.php" => "signature"]
-   && array_column($d["unresolved"], "missing") === ["WP_REST_Controller"] && $d["loaded"] === 2;
-if (!$ok) { fwrite(STDERR, json_encode($d, JSON_PRETTY_PRINT)); exit(1); }' "$TMP/rt-files.json" || fail "files mode did not classify the fixture files"
+   && array_column($d["unresolved"], "missing", "unit") === ["includes/class-loader.php" => "constant PLAIN_DIR", "includes/class-rest.php" => "WP_REST_Controller"]
+   && $d["loaded"] === 2;
+if (!$ok) { fwrite(STDERR, json_encode($d, JSON_PRETTY_PRINT)); exit(1); }'
+php "$DIR/scripts/load_classes.php" "$DIR/fixtures/plain-app" --work="$TMP/work" > "$TMP/rt-files.json"
+php -r "$CHECK_FILES" "$TMP/rt-files.json" files || fail "files mode did not classify the fixture files"
+# composer.json without "autoload" (common in WordPress plugins and CodeIgniter 3): same result through the files mode
+if command -v composer > /dev/null 2>&1; then
+  cp -r "$DIR/fixtures/plain-app" "$TMP/plain-composer"
+  echo '{"name":"example/plain","require":{"php":">=7.2"}}' > "$TMP/plain-composer/composer.json"
+  php "$DIR/scripts/load_classes.php" "$TMP/plain-composer" --work="$TMP/work" --offline > "$TMP/rt-pc.json"
+  php -r "$CHECK_FILES" "$TMP/rt-pc.json" composer+files || fail "composer.json without autoload did not fall back to the files mode"
+fi
 php "$DIR/scripts/audit.php" "$DIR/fixtures/plain-app" --out="$TMP/rtstore" --skip=rector,phpcompat,libs --offline --load-classes > /dev/null 2>&1
 grep -q '"tool": "load_classes"' "$TMP/rtstore"/plain-app/scans/*/report.json || fail "audit.php --load-classes did not store the runtime proof"
 echo "load classes (files): ok"

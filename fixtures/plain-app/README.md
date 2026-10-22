@@ -7,3 +7,6 @@ Shaped like a WordPress plugin or legacy code without Composer, used by `tests/r
 - `includes/class-widget.php` overrides `render()` with an extra required parameter: fatal on PHP 8.
 - `includes/functions.php` declares a function inside `if (!function_exists(...))`: loads fine.
 - `includes/class-rest.php` extends a class that is not in the repo: unresolved.
+- `includes/class-loader.php` requires a file through a constant only the bootstrap defines: unresolved.
+- `tests/stubs.php` redeclares a built-in class and copies `Plain_Base`: skipped, and `Plain_Base` still
+  comes from `includes/class-base.php`.

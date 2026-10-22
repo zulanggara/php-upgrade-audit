@@ -147,15 +147,14 @@ if ($out['mode'] === 'composer') {
         $units[] = ['id' => $class, 'file' => $rel, 'cmd' => [$php, __FILE__, '--child', 'composer', "$work/vendor/autoload.php", $class]];
     }
     if (!$vendorOnly && $units === []) {
-        $out['notes'][] = 'composer.json declares no autoload for the application (psr-4, psr-0, classmap), so there are no app classes to load. Try --vendor-only, or the files mode by auditing without composer.json.';
+        // composer.json only lists dependencies (common for WordPress plugins and CodeIgniter 3): load the
+        // app's own files as in the files mode, with the installed packages available through the autoloader.
+        $out['mode'] = 'composer+files';
+        $out['notes'][] = 'composer.json declares no autoload for the application, so its files were loaded as in the files mode, with vendor/autoload.php available.';
+        $units = filesUnits($out, $php, $work, "$work/vendor/autoload.php");
     }
 } else {
-    [$decl, $skipped, $consts] = scanDeclarations($work);
-    $out['skipped'] = $skipped;
-    file_put_contents("$work/.load-map.json", json_encode(['map' => $decl['map'], 'consts' => $consts, 'root' => $work]));
-    foreach ($decl['files'] as $rel) {
-        $units[] = ['id' => $rel, 'file' => $rel, 'cmd' => [$php, __FILE__, '--child', 'files', "$work/.load-map.json", "$work/$rel"]];
-    }
+    $units = filesUnits($out, $php, $work, null);
 }
 collect($out, runUnits($units, $jobs, $timeout), [$work => '']);
 if ($out['mode'] === 'composer' && !$dev && $out['unresolved'] !== [] && !empty($composerJson['require-dev'])) {
@@ -164,6 +163,19 @@ if ($out['mode'] === 'composer' && !$dev && $out['unresolved'] !== [] && !empty(
 finish($out);
 
 // ---------------------------------------------------------------------------------------------
+
+/** Units of the files mode; $autoload: vendor/autoload.php to register first, if any. */
+function filesUnits(array &$out, string $php, string $work, ?string $autoload): array
+{
+    [$decl, $skipped, $consts] = scanDeclarations($work);
+    $out['skipped'] = $skipped;
+    file_put_contents("$work/.load-map.json", json_encode(['map' => $decl['map'], 'consts' => $consts, 'root' => $work, 'autoload' => $autoload]));
+    $units = [];
+    foreach ($decl['files'] as $rel) {
+        $units[] = ['id' => $rel, 'file' => $rel, 'cmd' => [$php, __FILE__, '--child', 'files', "$work/.load-map.json", "$work/$rel"]];
+    }
+    return $units;
+}
 
 function finish(array $out): never
 {
@@ -247,8 +259,8 @@ function composerInstall(string $php, string $work, bool $offline, bool $dev): a
         [$code, $o] = runCmd($args);
         if ($code !== 0 && preg_match('/requires php|php version|__root__ requires php|your php version/i', $o)) {
             $result['platform_php_ignored'] = true;
-            $result['message'] = 'composer.lock does not install on PHP ' . trim((string) shell_exec(escapeshellarg($php) . ' -r "echo PHP_VERSION;"'))
-                . ' without ignoring its php requirement: ' . lastLines($o);
+            $result['message'] = ($result['lock'] ? 'composer.lock does not' : 'The composer.json dependencies (no composer.lock) do not') . ' install on PHP '
+                . trim((string) shell_exec(escapeshellarg($php) . ' -r "echo PHP_VERSION;"')) . ' without ignoring the php requirement: ' . lastLines($o);
             [$code, $o] = runCmd([...$args, '--ignore-platform-req=php']);
         }
         if ($code !== 0) {
@@ -285,11 +297,13 @@ function scanDeclarations(string $root): array
     $map = [];
     $skipped = [];
     $consts = [];
-    foreach (listPhpFiles($root, []) as $path) {
+    $isTestPath = fn (string $rel): bool => (bool) preg_match('#(^|/)(tests?|stubs?|fixtures?|spec)(/|$)|stubs?\.php$#i', $rel);
+    foreach (listPhpFiles($root, DEFAULT_EXCLUDES) as $path) {
         $rel = substr($path, strlen($root) + 1);
         $tokens = array_values(array_filter(token_get_all((string) file_get_contents($path)), fn ($t) => !is_array($t) || !in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)));
         $ns = '';
         $why = topLevelSideEffect($tokens, $consts);
+        $declared = [];
         foreach ($tokens as $i => $t) {
             if (is_array($t) && $t[0] === T_NAMESPACE && is_array($tokens[$i + 1] ?? null)) {
                 $ns = in_array($tokens[$i + 1][0], [T_STRING, T_NAME_QUALIFIED], true) ? $tokens[$i + 1][1] : '';
@@ -297,7 +311,18 @@ function scanDeclarations(string $root): array
             if (is_array($t) && in_array($t[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)
                 && is_array($tokens[$i + 1] ?? null) && $tokens[$i + 1][0] === T_STRING
                 && !(is_array($tokens[$i - 1] ?? null) && in_array($tokens[$i - 1][0], [T_DOUBLE_COLON, T_NEW], true))) {
-                $map[strtolower(($ns === '' ? '' : $ns . '\\') . $tokens[$i + 1][1])] = $rel;
+                $declared[] = ($ns === '' ? '' : $ns . '\\') . $tokens[$i + 1][1];
+            }
+        }
+        $builtin = array_values(array_filter($declared, fn ($c) => class_exists($c, false) || interface_exists($c, false) || trait_exists($c, false)));
+        if ($why === null && $builtin !== []) {
+            $why = 'redeclares a built-in class (' . $builtin[0] . '), e.g. a stub file';
+        }
+        foreach ($declared as $c) {
+            $k = strtolower($c);
+            // The same class in several files: prefer the application's own over tests and stubs.
+            if (!in_array($c, $builtin, true) && (!isset($map[$k]) || ($isTestPath($map[$k]) && !$isTestPath($rel)))) {
+                $map[$k] = $rel;
             }
         }
         if ($why === null) {
@@ -539,6 +564,9 @@ function collect(array &$out, array $results, array $roots): void
         } elseif (preg_match('#"([a-z0-9_.-]+/[a-z0-9_.-]+)" package is not installed|composer require ([a-z0-9_.-]+/[a-z0-9_.-]+)#i', $msg, $m)) {
             // Optional dependency: the library refuses to load without a package (Symfony, Laminas, ...).
             $out['unresolved'][] = $row + ['missing' => $m[1] !== '' ? $m[1] : $m[2]];
+        } elseif ($why = bootstrapNeed($msg, $row['type'])) {
+            // Needs what the app's bootstrap sets up (a constant, an include path, a function): not a PHP problem.
+            $out['unresolved'][] = $row + ['missing' => $why];
         } else {
             $row['type'] = match (true) {
                 $row['type'] === 'timeout' => 'timeout',
@@ -552,6 +580,18 @@ function collect(array &$out, array $results, array $roots): void
     $out['deprecations'] = array_values($agg['deprecations']);
     $out['library_deprecations'] = array_values($agg['library_deprecations']);
     $out['warnings'] = array_values($agg['warnings']);
+}
+
+/** What a load failure says the app's bootstrap would have provided, or null for a real failure. */
+function bootstrapNeed(string $msg, string $type): ?string
+{
+    return match (true) {
+        (bool) preg_match('/Undefined constant "?([\\\\\w]+)"?/', $msg, $m) => 'constant ' . $m[1],
+        (bool) preg_match('/Failed opening required \'([^\']*)\'/', $msg, $m) => 'include ' . $m[1],
+        (bool) preg_match('/Call to undefined function ([\\\\\w]+)\(/', $msg, $m) => 'function ' . $m[1] . '()',
+        $type === 'exit' => 'stopped by exit/die while loading (a guard or bootstrap check)',
+        default => null,
+    };
 }
 
 /**
@@ -598,6 +638,11 @@ function child(array $a): never
             $fail = $ok ? null : ['type' => 'fatal', 'message' => "Class \"$what\" not found"];
         } else {
             $cfg = json_decode((string) file_get_contents($boot), true);
+            if (!empty($cfg['autoload'])) {
+                require $cfg['autoload'];
+            }
+            // Relative includes resolve like they would from the app root or the file's own folder.
+            set_include_path(implode(PATH_SEPARATOR, [dirname((string) $what), $cfg['root'], get_include_path()]));
             foreach ($cfg['consts'] as $c) {
                 if (!defined($c)) {
                     define($c, $cfg['root'] . '/');
