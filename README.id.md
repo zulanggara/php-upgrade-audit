@@ -153,7 +153,7 @@ php scripts/audit.php . --out="$RUNNER_TEMP/php-audit" --target=8.4 --skip=recto
 ```
 
 Exit code setiap script: `0` ok, `1` salah pemakaian, `2` masalah environment (mis. tool belum terpasang),
-`10` ada temuan di tingkat `--fail-on` atau di atasnya (`wajib` > `deprecated` > `perilaku`). Akhir output
+`4` `render.php` menolak menulis laporan yang masih memuat rahasia, `10` ada temuan di tingkat `--fail-on` atau di atasnya (`wajib` > `deprecated` > `perilaku`). Akhir output
 merangkum jumlah temuan per tingkat.
 
 ## Memilih versi PHP target

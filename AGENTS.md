@@ -111,6 +111,7 @@ results and remove `carried_from`.
 ## CI
 
 `audit.php --fail-on=wajib|deprecated|perilaku` exits 10 when there are findings at that level or above.
-Exit codes of every script: 0 ok, 1 wrong usage, 2 environment problem, 10 findings / note errors.
+Exit codes of every script: 0 ok, 1 wrong usage, 2 environment problem, 4 render refused (a secret is still in
+the page data), 10 findings / note errors.
 
 More detail: `README.md` (English), `README.id.md` (Bahasa Indonesia), `references/`.

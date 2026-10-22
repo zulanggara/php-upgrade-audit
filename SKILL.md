@@ -162,5 +162,5 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
 | `scripts/redact.php` | Secret redaction used by every writer and the renderer |
 | `scripts/render.php` | Store → one HTML report (`assets/report-template.html`) |
 
-Exit codes of every script: 0 ok, 1 wrong usage, 2 environment problem, 10 findings (`audit.php --fail-on`) or
-note errors (`validate_notes.php`). Adding or fixing rules: `references/rules.md`. Tests: `bash tests/run.sh`.
+Exit codes of every script: 0 ok, 1 wrong usage, 2 environment problem, 4 `render.php` refused to write a report
+that still contains a secret, 10 findings (`audit.php --fail-on`) or note errors (`validate_notes.php`). Adding or fixing rules: `references/rules.md`. Tests: `bash tests/run.sh`.

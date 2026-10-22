@@ -27,6 +27,7 @@ function opt(array $argv, string $name, ?string $default = null): ?string
 /**
  * Exit codes shared by every script:
  *   0 ok, 1 wrong usage, 2 environment problem (e.g. analysis tools not installed),
+ *   4 render.php refused to write a report that still contains a secret,
  *   10 audit.php --fail-on: findings at or above that level.
  */
 const EXIT_USAGE = 1;

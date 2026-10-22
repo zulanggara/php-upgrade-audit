@@ -150,8 +150,8 @@ a browser.
 php scripts/audit.php . --out="$RUNNER_TEMP/php-audit" --target=8.4 --skip=rector --fail-on=wajib
 ```
 
-Exit codes of every script: `0` ok, `1` wrong usage, `2` environment problem (e.g. tools not installed), `10`
-findings at the `--fail-on` level or above (`wajib` > `deprecated` > `perilaku`). The end of the output
+Exit codes of every script: `0` ok, `1` wrong usage, `2` environment problem (e.g. tools not installed), `4` `render.php`
+refused to write a report that still contains a secret, `10` findings at the `--fail-on` level or above (`wajib` > `deprecated` > `perilaku`). The end of the output
 summarises the findings per level.
 
 ## Choosing the target PHP
