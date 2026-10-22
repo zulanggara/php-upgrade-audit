@@ -1,0 +1,130 @@
+{
+  "status": {
+    "level": "wajib",
+    "label": "Not ready: 3 compile errors, removed functions"
+  },
+  "summary": "src/Legacy.php does not compile on PHP 8: three removed constructs stop it (php -l only shows the first one). After that, three removed features (PHP 4 constructor, each(), mysql_*) and the mcrypt extension must be replaced, and four libraries are abandoned or far behind. Roughly 1-2 days of work plus testing.",
+  "notes": [
+    {
+      "sev": "wajib",
+      "title": "The file does not compile: 3 removed constructs",
+      "body": "The curly brace string offset ($name{0}), the (real) cast and __autoload() were removed in PHP 8.0. Each one stops compilation, and php -l reports only the first per file, so fix all three before re-scanning (the scanner lists every one).",
+      "files": [
+        "src/Legacy.php:16",
+        "src/Legacy.php:69",
+        "src/Legacy.php:44"
+      ],
+      "code": [
+        {
+          "where": "src/Legacy.php:16",
+          "before": "$first = $name{0};",
+          "after": "$first = $name[0];"
+        },
+        {
+          "where": "src/Legacy.php:69",
+          "before": "$f = (real) $n;",
+          "after": "$f = (float) $n;"
+        },
+        {
+          "where": "src/Legacy.php:44",
+          "before": "function __autoload($c) {}",
+          "after": "spl_autoload_register(function ($c) {});",
+          "note": "With all three changed, php -l on 8.5.12 reports no syntax error."
+        }
+      ]
+    },
+    {
+      "sev": "wajib",
+      "title": "PHP 4 style constructor no longer runs",
+      "body": "Since PHP 8.0 a method with the class name is an ordinary method, so Legacy::Legacy() is never called and $declared stays null. Rename it to __construct(). Also declare $undeclared (dynamic property, deprecated since 8.2).",
+      "files": [
+        "src/Legacy.php:7"
+      ],
+      "code": [
+        {
+          "where": "src/Legacy.php:7-11",
+          "before": "function Legacy()\n{\n    $this->declared = 1;\n    $this->undeclared = 2;\n}",
+          "after": "public $undeclared;\n\npublic function __construct()\n{\n    $this->declared = 1;\n    $this->undeclared = 2;\n}",
+          "note": "Checked on 8.5.12: the property is set, no deprecation."
+        }
+      ]
+    },
+    {
+      "sev": "wajib",
+      "title": "each() was removed",
+      "body": "each() is gone since PHP 8.0 (fatal: undefined function). For a single call, read the current element and advance the pointer; for loops, use foreach.",
+      "files": [
+        "src/Legacy.php:54"
+      ],
+      "code": [
+        {
+          "where": "src/Legacy.php:54",
+          "before": "$r = each($arr);",
+          "after": "$key = key($arr);\n$r = $key === null ? false : [1 => $arr[$key], 'value' => $arr[$key], 0 => $key, 'key' => $key];\nnext($arr);",
+          "note": "Gives exactly what each() returned on PHP 7.4, and moves the pointer the same way."
+        }
+      ]
+    },
+    {
+      "sev": "perilaku",
+      "title": "Concatenation and + changed precedence",
+      "body": "Since PHP 8.0, + and - bind tighter than the dot. \"Total: \" . $n + 1 printed 1 on PHP 7.4 (with a warning) and prints \"Total: 6\" on 8.x. Add parentheses so the intent is explicit on every version.",
+      "files": [
+        "src/Legacy.php:19"
+      ],
+      "code": [
+        {
+          "where": "src/Legacy.php:19",
+          "before": "echo \"Total: \" . $n + 1;",
+          "after": "echo \"Total: \" . ($n + 1);",
+          "note": "Prints \"Total: 6\" on 7.4 and 8.5.12."
+        }
+      ]
+    },
+    {
+      "sev": "deprecated",
+      "title": "Deprecations on 8.4/8.5: implicit nullable, (integer), backticks",
+      "body": "All three still run but emit E_DEPRECATED on 8.5.12 (php -l shows them). Rector fixes the first two automatically.",
+      "files": [
+        "src/Legacy.php:28",
+        "src/Legacy.php:17",
+        "src/Legacy.php:18"
+      ],
+      "code": [
+        {
+          "where": "src/Legacy.php:28",
+          "before": "public function typed(string $x = null, int $y = 1) {}",
+          "after": "public function typed(?string $x = null, int $y = 1) {}"
+        },
+        {
+          "where": "src/Legacy.php:17",
+          "before": "$n = (integer) \"5\";",
+          "after": "$n = (int) \"5\";"
+        },
+        {
+          "where": "src/Legacy.php:18",
+          "before": "$out = `ls -la`;",
+          "after": "$out = shell_exec('ls -la');",
+          "note": "Quote any variable part with escapeshellarg()."
+        }
+      ]
+    },
+    {
+      "sev": "wajib",
+      "title": "Libraries and extensions to replace",
+      "body": "ext-mcrypt was removed from PHP (7.2): use openssl_encrypt()/sodium and make sure existing data can still be decrypted. phpoffice/phpexcel and swiftmailer/swiftmailer are abandoned; guzzle 6, monolog 1 and php-jwt 5 have newer majors that support 8.5. mysql_* (line 62) needs PDO or mysqli. acme/internal-sdk is private: check its own repository.",
+      "files": [
+        "composer.json",
+        "src/Legacy.php:62"
+      ],
+      "code": [
+        {
+          "where": "composer.json",
+          "before": "\"phpoffice/phpexcel\": \"^1.8\",\n\"swiftmailer/swiftmailer\": \"^5.4\",",
+          "after": "\"phpoffice/phpspreadsheet\": \"^2.0\",\n\"symfony/mailer\": \"^7.0\",",
+          "note": "Different APIs: plan the migration of the calling code."
+        }
+      ]
+    }
+  ]
+}

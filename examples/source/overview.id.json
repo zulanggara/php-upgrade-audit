@@ -1,0 +1,45 @@
+{
+  "goal": {
+    "title": "Tujuan scan",
+    "text": "Apakah proyek contoh siap pindah dari PHP 7.1 ke PHP 8.5.12, dan apa yang harus diubah lebih dulu?",
+    "points": [
+      "Kode yang tidak jalan lagi atau berubah perilaku di 8.5.12",
+      "Library dan ekstensi yang menghalangi upgrade",
+      "Bukti langsung di PHP 8.5.12 (php -l dan pemuatan class)"
+    ],
+    "scope": [
+      {
+        "k": "Target",
+        "v": "PHP 8.5.12"
+      },
+      {
+        "k": "Saat ini",
+        "v": "PHP 7.1.33 (config.platform di composer.json)"
+      },
+      {
+        "k": "Repo",
+        "v": "legacy-app, composer-app (fixture bawaan)"
+      },
+      {
+        "k": "Tidak dicakup",
+        "v": "Menjalankan aplikasi atau test suite-nya"
+      }
+    ]
+  },
+  "summary": "Belum siap. Satu error kompilasi diperbaiki di antara dua scan, dan itu memunculkan error berikutnya: php -l berhenti di parse error pertama per file. Penghalang yang tersisa: dua error kompilasi, tiga fitur PHP yang dihapus, ekstensi mcrypt, dan empat library yang usang. composer-app lolos kompilasi, tapi satu class gagal dimuat di 8.5.12.",
+  "steps": [
+    "Perbaiki tiga error kompilasi supaya file bisa dimuat (satu sudah di scan kedua).",
+    "Ganti constructor gaya PHP 4, each(), dan mysql_* (lihat catatan, lengkap dengan kode yang sudah diuji).",
+    "Ganti mcrypt dengan openssl atau sodium; pastikan data lama tetap bisa didekripsi.",
+    "Upgrade atau ganti library yang berstatus Tidak didukung / Perlu upgrade.",
+    "Jalankan Rector untuk deprecation (implicit nullable, (integer)), lalu scan ulang: versi baru ditambahkan dan laporan menunjukkan apa yang teratasi.",
+    "Jalankan test suite di PHP 8.5.12 dengan error_reporting(E_ALL) sebelum production dipindah."
+  ],
+  "notes": [
+    {
+      "sev": "info",
+      "title": "Tentang contoh ini",
+      "body": "Dibuat oleh examples/build.sh dari fixtures/legacy-app (kode PHP 7 yang sengaja dibuat bermasalah, dua scan: scan kedua dijalankan pada salinan yang offset kurung kurawalnya sudah diperbaiki, untuk memperlihatkan pemilih versi dan angka teratasi / baru) dan fixtures/composer-app (bukti runtime: setiap class dimuat di PHP 8.5.12)."
+    }
+  ]
+}

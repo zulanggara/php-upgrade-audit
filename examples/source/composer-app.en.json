@@ -1,0 +1,45 @@
+{
+  "status": {
+    "level": "wajib",
+    "label": "Not ready: 1 class fails to load"
+  },
+  "summary": "The code scanner finds little here, but loading every class on PHP 8.5.12 shows that App\\Model\\Report cannot be declared at all: its handle() signature is incompatible with the parent, which PHP 7 only warned about. One small fix, plus a return type for Counter::count().",
+  "notes": [
+    {
+      "sev": "wajib",
+      "title": "Report::handle() is incompatible with Base::handle()",
+      "body": "The child requires an extra parameter. PHP 7.4 loaded the class with a warning; PHP 8.0+ refuses to declare it (fatal), so every request that touches Report fails. Make the extra parameter optional.",
+      "files": [
+        "src/Model/Report.php:6"
+      ],
+      "code": [
+        {
+          "where": "src/Model/Report.php:6",
+          "before": "public function handle($input, $format)",
+          "after": "public function handle($input, $format = '')",
+          "note": "Loads without a warning on 7.4 and 8.5.12; callers that pass $format are unchanged."
+        }
+      ]
+    },
+    {
+      "sev": "deprecated",
+      "title": "Countable::count() without return type",
+      "body": "PHP 8.1 added a tentative return type to Countable::count(); without it every load emits E_DEPRECATED.",
+      "files": [
+        "src/Model/Counter.php:6"
+      ],
+      "code": [
+        {
+          "where": "src/Model/Counter.php:6",
+          "before": "public function count()",
+          "after": "public function count(): int"
+        }
+      ]
+    },
+    {
+      "sev": "info",
+      "title": "Unresolved classes are not PHP problems",
+      "body": "Plugin extends a class from a package that is not installed, and Optional refuses to load without acme/missing. Install those packages (or ignore the classes) before drawing conclusions about them."
+    }
+  ]
+}

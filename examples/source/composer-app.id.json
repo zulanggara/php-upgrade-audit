@@ -1,0 +1,45 @@
+{
+  "status": {
+    "level": "wajib",
+    "label": "Belum siap: 1 class gagal dimuat"
+  },
+  "summary": "Scanner kode hanya menemukan sedikit di sini, tapi memuat semua class di PHP 8.5.12 menunjukkan bahwa App\\Model\\Report sama sekali tidak bisa dideklarasikan: signature handle()-nya tidak kompatibel dengan induknya, hal yang di PHP 7 hanya memunculkan warning. Cukup satu perbaikan kecil, plus return type untuk Counter::count().",
+  "notes": [
+    {
+      "sev": "wajib",
+      "title": "Report::handle() tidak kompatibel dengan Base::handle()",
+      "body": "Class turunan mewajibkan satu parameter tambahan. PHP 7.4 tetap memuat class itu dengan warning; PHP 8.0+ menolak mendeklarasikannya (fatal), jadi setiap request yang menyentuh Report gagal. Jadikan parameter tambahannya opsional.",
+      "files": [
+        "src/Model/Report.php:6"
+      ],
+      "code": [
+        {
+          "where": "src/Model/Report.php:6",
+          "before": "public function handle($input, $format)",
+          "after": "public function handle($input, $format = '')",
+          "note": "Dimuat tanpa warning di 7.4 dan 8.5.12; pemanggil yang mengirim $format tidak berubah."
+        }
+      ]
+    },
+    {
+      "sev": "deprecated",
+      "title": "Countable::count() tanpa return type",
+      "body": "PHP 8.1 menambahkan tentative return type pada Countable::count(); tanpa itu setiap kali dimuat muncul E_DEPRECATED.",
+      "files": [
+        "src/Model/Counter.php:6"
+      ],
+      "code": [
+        {
+          "where": "src/Model/Counter.php:6",
+          "before": "public function count()",
+          "after": "public function count(): int"
+        }
+      ]
+    },
+    {
+      "sev": "info",
+      "title": "Class unresolved bukan masalah PHP",
+      "body": "Plugin meng-extend class dari package yang belum terpasang, dan Optional menolak dimuat tanpa acme/missing. Pasang package tersebut (atau abaikan class-nya) sebelum menyimpulkan apa pun tentang class itu."
+    }
+  ]
+}

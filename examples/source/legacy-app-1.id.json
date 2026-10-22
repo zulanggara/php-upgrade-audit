@@ -1,0 +1,130 @@
+{
+  "status": {
+    "level": "wajib",
+    "label": "Belum siap: 3 error kompilasi, fungsi yang dihapus"
+  },
+  "summary": "src/Legacy.php tidak bisa dikompilasi di PHP 8: tiga konstruksi yang sudah dihapus menghentikannya (php -l hanya menampilkan yang pertama). Setelah itu, tiga fitur yang dihapus (constructor gaya PHP 4, each(), mysql_*) dan ekstensi mcrypt harus diganti, dan empat library sudah abandoned atau jauh tertinggal. Perkiraan 1-2 hari kerja ditambah pengujian.",
+  "notes": [
+    {
+      "sev": "wajib",
+      "title": "File tidak bisa dikompilasi: 3 konstruksi yang dihapus",
+      "body": "Offset string dengan kurung kurawal ($name{0}), cast (real), dan __autoload() dihapus di PHP 8.0. Masing-masing menghentikan kompilasi, dan php -l hanya melaporkan yang pertama per file, jadi perbaiki ketiganya sebelum scan ulang (scanner mencantumkan semuanya).",
+      "files": [
+        "src/Legacy.php:16",
+        "src/Legacy.php:69",
+        "src/Legacy.php:44"
+      ],
+      "code": [
+        {
+          "where": "src/Legacy.php:16",
+          "before": "$first = $name{0};",
+          "after": "$first = $name[0];"
+        },
+        {
+          "where": "src/Legacy.php:69",
+          "before": "$f = (real) $n;",
+          "after": "$f = (float) $n;"
+        },
+        {
+          "where": "src/Legacy.php:44",
+          "before": "function __autoload($c) {}",
+          "after": "spl_autoload_register(function ($c) {});",
+          "note": "Setelah ketiganya diubah, php -l di 8.5.12 tidak melaporkan syntax error."
+        }
+      ]
+    },
+    {
+      "sev": "wajib",
+      "title": "Constructor gaya PHP 4 tidak lagi dijalankan",
+      "body": "Sejak PHP 8.0, method dengan nama class hanyalah method biasa, jadi Legacy::Legacy() tidak pernah dipanggil dan $declared tetap null. Ganti namanya menjadi __construct(). Deklarasikan juga $undeclared (dynamic property, deprecated sejak 8.2).",
+      "files": [
+        "src/Legacy.php:7"
+      ],
+      "code": [
+        {
+          "where": "src/Legacy.php:7-11",
+          "before": "function Legacy()\n{\n    $this->declared = 1;\n    $this->undeclared = 2;\n}",
+          "after": "public $undeclared;\n\npublic function __construct()\n{\n    $this->declared = 1;\n    $this->undeclared = 2;\n}",
+          "note": "Diuji di 8.5.12: properti terisi, tanpa deprecation."
+        }
+      ]
+    },
+    {
+      "sev": "wajib",
+      "title": "each() sudah dihapus",
+      "body": "each() tidak ada lagi sejak PHP 8.0 (fatal: undefined function). Untuk satu pemanggilan, baca elemen saat ini lalu majukan pointer; untuk loop, pakai foreach.",
+      "files": [
+        "src/Legacy.php:54"
+      ],
+      "code": [
+        {
+          "where": "src/Legacy.php:54",
+          "before": "$r = each($arr);",
+          "after": "$key = key($arr);\n$r = $key === null ? false : [1 => $arr[$key], 'value' => $arr[$key], 0 => $key, 'key' => $key];\nnext($arr);",
+          "note": "Hasilnya persis sama dengan each() di PHP 7.4, dan pointer maju dengan cara yang sama."
+        }
+      ]
+    },
+    {
+      "sev": "perilaku",
+      "title": "Prioritas operator titik dan + berubah",
+      "body": "Sejak PHP 8.0, + dan - lebih kuat daripada titik. \"Total: \" . $n + 1 mencetak 1 di PHP 7.4 (dengan warning) dan mencetak \"Total: 6\" di 8.x. Tambahkan kurung supaya maksudnya jelas di semua versi.",
+      "files": [
+        "src/Legacy.php:19"
+      ],
+      "code": [
+        {
+          "where": "src/Legacy.php:19",
+          "before": "echo \"Total: \" . $n + 1;",
+          "after": "echo \"Total: \" . ($n + 1);",
+          "note": "Mencetak \"Total: 6\" di 7.4 dan 8.5.12."
+        }
+      ]
+    },
+    {
+      "sev": "deprecated",
+      "title": "Deprecation di 8.4/8.5: implicit nullable, (integer), backtick",
+      "body": "Ketiganya masih jalan tapi memunculkan E_DEPRECATED di 8.5.12 (terlihat di php -l). Rector bisa memperbaiki dua yang pertama secara otomatis.",
+      "files": [
+        "src/Legacy.php:28",
+        "src/Legacy.php:17",
+        "src/Legacy.php:18"
+      ],
+      "code": [
+        {
+          "where": "src/Legacy.php:28",
+          "before": "public function typed(string $x = null, int $y = 1) {}",
+          "after": "public function typed(?string $x = null, int $y = 1) {}"
+        },
+        {
+          "where": "src/Legacy.php:17",
+          "before": "$n = (integer) \"5\";",
+          "after": "$n = (int) \"5\";"
+        },
+        {
+          "where": "src/Legacy.php:18",
+          "before": "$out = `ls -la`;",
+          "after": "$out = shell_exec('ls -la');",
+          "note": "Bagian yang berasal dari variabel dibungkus escapeshellarg()."
+        }
+      ]
+    },
+    {
+      "sev": "wajib",
+      "title": "Library dan ekstensi yang harus diganti",
+      "body": "ext-mcrypt sudah dihapus dari PHP (7.2): pakai openssl_encrypt()/sodium dan pastikan data lama tetap bisa didekripsi. phpoffice/phpexcel dan swiftmailer/swiftmailer sudah abandoned; guzzle 6, monolog 1, dan php-jwt 5 punya major baru yang mendukung 8.5. mysql_* (baris 62) perlu diganti PDO atau mysqli. acme/internal-sdk adalah package privat: cek di repo-nya sendiri.",
+      "files": [
+        "composer.json",
+        "src/Legacy.php:62"
+      ],
+      "code": [
+        {
+          "where": "composer.json",
+          "before": "\"phpoffice/phpexcel\": \"^1.8\",\n\"swiftmailer/swiftmailer\": \"^5.4\",",
+          "after": "\"phpoffice/phpspreadsheet\": \"^2.0\",\n\"symfony/mailer\": \"^7.0\",",
+          "note": "API-nya berbeda: rencanakan migrasi kode pemanggilnya."
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 <?php
-// each() di komentar tidak boleh terdeteksi: each($x)
+// each() in a comment must not be detected: each($x)
 class Legacy
 {
     public $declared;
