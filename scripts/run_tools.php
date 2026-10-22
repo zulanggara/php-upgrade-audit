@@ -44,7 +44,11 @@ $bin = realpath(__DIR__ . '/../tools/vendor/bin');
 if ($only === null || $only === 'phpcompat') {
     // Absolute patterns relative to the repo, so a repo whose own path contains "/vendor/" is still scanned.
     $ignore = implode(',', array_map(fn ($e) => "$repo/$e/*", $excludes));
-    $cmd = [PHP_BINARY, '-d', 'memory_limit=' . $memory, "$bin/phpcs", '--standard=PHPCompatibility', '--runtime-set', 'testVersion', $minor,
+    // Register the standards explicitly: the Composer plugin that normally does it is skipped when Composer
+    // runs as root or with plugins disabled, and phpcs would then report "PHPCompatibility is not installed".
+    $standards = implode(',', array_filter([toolsVendor() . '/phpcompatibility/php-compatibility', toolsVendor() . '/phpcsstandards/phpcsutils'], 'is_dir'));
+    $cmd = [PHP_BINARY, '-d', 'memory_limit=' . $memory, "$bin/phpcs", '--runtime-set', 'installed_paths', $standards,
+        '--standard=PHPCompatibility', '--runtime-set', 'testVersion', $minor,
         '--extensions=' . implode(',', PHP_EXTS), "--ignore=$ignore", '--report=json', '-q', '--no-cache', '--parallel=8', $repo];
     [$code, $stdout, $stderr] = run($cmd, $outDir);
     $raw = json_decode($stdout, true);

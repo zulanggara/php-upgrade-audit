@@ -30,6 +30,15 @@ php "$DIR/scripts/lint.php" "$DIR/fixtures/legacy-app" > "$TMP/lint.json"
 grep -q '"Parse error"' "$TMP/lint.json" || fail "lint did not report the parse error"
 echo "lint: ok"
 
+# PHPCompatibility must find its standard even when Composer skipped its plugins (root, CI, --no-plugins)
+if [ -f "$DIR/tools/vendor/autoload.php" ]; then
+  php "$DIR/scripts/run_tools.php" "$DIR/fixtures/legacy-app" --out="$TMP/tools" --only=phpcompat
+  grep -q '"ok": true' "$TMP/tools/phpcompat.json" || fail "PHPCompatibility did not run: $(grep -m1 stderr "$TMP/tools/phpcompat.json")"
+  echo "phpcompat: ok"
+else
+  echo "phpcompat: skipped (tools not installed)"
+fi
+
 # History: two scans → two versions, the first one byte-identical afterwards
 STORE="$TMP/store"
 php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$STORE" --name=legacy-app --skip=rector,phpcompat --offline 2>/dev/null >/dev/null
