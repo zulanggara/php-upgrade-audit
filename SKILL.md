@@ -101,9 +101,12 @@ The same workflow is described for other AI coding agents in `AGENTS.md`; keep b
    ```
    - One page per repo/comparison, a version selector per page (latest by default; older scans stay
      reachable as `#<repo>~<scan-id>`), and a dashboard.
-   - **Claude with Artifacts**: publish `report.html` with the Artifact tool (icon `code`). Re-render to the same
-     path and publish again to keep the URL. After the first publish, render again with `--url=<link>` so the
-     "Copy link" buttons point at the artifact. The template already follows the artifact page contract.
+   - **Claude with Artifacts**: publish `report.html` with the Artifact tool (icon `code`). Keep **one**
+     artifact per store. To update it, publish the same file path again **or pass the existing artifact `url`**;
+     a different file path without `url` silently creates a second artifact (and the old one stays online with
+     stale content). Before a first publish, check the store's memory/notes or `Artifact list` for an existing
+     report artifact. After the first publish, render again with `--url=<link>` so the "Copy link" buttons point
+     at the artifact, then publish again. The template already follows the artifact page contract.
    - **Anywhere else**: open the file in a browser, or `php -S 127.0.0.1:8085 -t <STORE>` and visit
      `http://127.0.0.1:8085/report.html`. Use `--offline` for a page that makes no external request.
    - Before publishing, check the render log: it prints how many values were redacted.
