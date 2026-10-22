@@ -30,6 +30,16 @@ php "$DIR/scripts/lint.php" "$DIR/fixtures/legacy-app" > "$TMP/lint.json"
 grep -q '"Parse error"' "$TMP/lint.json" || fail "lint did not report the parse error"
 echo "lint: ok"
 
+# Profile: PHP version hints from Dockerfiles and CI config, in nested folders too
+mkdir -p "$TMP/hints/docker/php" "$TMP/hints/.github/workflows"
+echo 'FROM php:7.3-fpm' > "$TMP/hints/docker/php/Dockerfile"
+printf 'steps:\n  - with:\n      php-version: "7.4"\n' > "$TMP/hints/.github/workflows/ci.yml"
+echo '<?php echo 1;' > "$TMP/hints/a.php"
+php "$DIR/scripts/detect.php" "$TMP/hints" > "$TMP/hints.json"
+grep -q '"docker/php/Dockerfile:1"' "$TMP/hints.json" || fail "PHP hint in docker/php/Dockerfile not found"
+grep -q '"value": "7.4"' "$TMP/hints.json" || fail "PHP hint in the CI workflow not found"
+echo "profile: ok"
+
 # PHPCompatibility must find its standard even when Composer skipped its plugins (root, CI, --no-plugins)
 if [ -f "$DIR/tools/vendor/autoload.php" ]; then
   php "$DIR/scripts/run_tools.php" "$DIR/fixtures/legacy-app" --out="$TMP/tools" --only=phpcompat

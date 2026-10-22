@@ -71,11 +71,14 @@ foreach (['.php-version', '.tool-versions', 'runtime.txt'] as $f) {
         $profile['php_hints'][] = ['source' => $f, 'value' => $m[1]];
     }
 }
-$candidates = array_merge(
-    glob("$repo/{Dockerfile,Dockerfile.*,*.Dockerfile,docker-compose*.yml,docker-compose*.yaml,.gitlab-ci.yml,Jenkinsfile,bitbucket-pipelines.yml}", GLOB_BRACE) ?: [],
-    glob("$repo/{docker,.docker,deploy,.github/workflows}/*", GLOB_BRACE) ?: [],
-    glob("$repo/{docker,.docker}/*/*", GLOB_BRACE) ?: []
-);
+// Plain patterns instead of GLOB_BRACE, which php.net documents as unavailable on some non-GNU systems.
+$candidates = [];
+foreach (['Dockerfile', 'Dockerfile.*', '*.Dockerfile', 'docker-compose*.yml', 'docker-compose*.yaml', 'compose*.yml', 'compose*.yaml',
+    '.gitlab-ci.yml', 'Jenkinsfile', 'bitbucket-pipelines.yml', '.travis.yml', 'docker/*', '.docker/*', 'deploy/*', '.github/workflows/*',
+    'docker/*/*', '.docker/*/*'] as $pattern) {
+    array_push($candidates, ...(glob("$repo/$pattern") ?: []));
+}
+$candidates = array_values(array_unique($candidates));
 foreach ($candidates as $f) {
     if (!is_file($f) || filesize($f) > 200_000) {
         continue;
