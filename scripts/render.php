@@ -21,6 +21,7 @@ declare(strict_types=1);
 ini_set('display_errors', 'stderr');
 require __DIR__ . '/lib.php';
 require __DIR__ . '/history.php';
+require __DIR__ . '/validate_notes.php';
 
 handleHelp($argv, <<<'HELP'
 Render the whole history store into ONE self-contained HTML report: a page per repo and comparison, every
@@ -54,6 +55,15 @@ $hidden = array_filter(explode(',', (string) opt($argv, 'hide', '')));
 
 history_migrate($store); // never lose legacy flat output
 history_archive_overview($store);
+
+// Notes are written by people and agents: report format problems, but still render.
+foreach (validate_store($store) as $file => $problems) {
+    foreach ($problems as $x) {
+        if ($x['level'] === 'error') {
+            fwrite(STDERR, "Warning: $file: {$x['where']}: {$x['message']}\n");
+        }
+    }
+}
 
 $rulesEn = $lang === 'en' ? require __DIR__ . '/rules_en.php' : [];
 $entities = [];

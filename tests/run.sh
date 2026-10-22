@@ -77,6 +77,35 @@ for lang in en id; do
 done
 echo "render: ok"
 
+# Notes validator: the carried-over notes of the second scan are flagged, a good file passes, a bad one fails
+set +e
+php "$DIR/scripts/validate_notes.php" --store="$STORE" > "$TMP/val.txt"; code=$?
+set -e
+[ "$code" = 10 ] || fail "validate_notes must exit 10 while carried_from is still set (got $code)"
+grep -q 'carried_from' "$TMP/val.txt" || fail "validate_notes did not flag carried_from"
+php "$DIR/scripts/render.php" --store="$STORE" --out="$TMP/r.html" 2> "$TMP/render-warn.txt"
+grep -q 'carried_from' "$TMP/render-warn.txt" || fail "render.php did not warn about unreviewed notes"
+cat > "$TMP/good.json" <<'JSON'
+{"status":{"level":"deprecated","label":"Ready after 2 fixes"},"summary":"Runs on the target.",
+ "notes":[{"sev":"deprecated","title":"Implicit nullable","body":"Add ?.","files":["a.php:3"],
+ "code":[{"where":"a.php:3","before":"function f(Foo $x = null)","after":"function f(?Foo $x = null)"}]}]}
+JSON
+php "$DIR/scripts/validate_notes.php" "$TMP/good.json" > /dev/null || fail "a valid notes.json was rejected"
+GHTOKEN="gh""p_$(printf 'a1B2%.0s' 1 2 3 4 5 6 7 8 9)"
+cat > "$TMP/bad.json" <<JSON
+{"status":{"level":"must-fix"},"sumary":"x","notes":[{"sev":"high","title":"","body":"token $GHTOKEN",
+ "code":[{"before":"x = 1"}]}]}
+JSON
+set +e
+php "$DIR/scripts/validate_notes.php" "$TMP/bad.json" --json > "$TMP/bad-out.json"; code=$?
+set -e
+[ "$code" = 10 ] || fail "an invalid notes.json was accepted"
+for w in status.level sumary 'notes\[0\].sev' 'notes\[0\].title' 'notes\[0\].code\[0\].after' 'notes\[0\].body'; do
+  grep -q "\"where\": \"$w\"" "$TMP/bad-out.json" || fail "validator missed $w"
+done
+grep -q "$GHTOKEN" "$TMP/bad-out.json" && fail "validator output contains the secret"
+echo "validate notes: ok"
+
 # First run: --help everywhere, exit codes, --fail-on, PHP version warning
 for s in audit scan_code lint check_libs run_tools detect compare_framework render validate_notes load_classes; do
   [ -f "$DIR/scripts/$s.php" ] || continue
