@@ -1,0 +1,15 @@
+{
+  "name": "php-upgrade-audit",
+  "description": "PHP upgrade audit skill",
+  "owner": {
+    "name": "Zul Anggara",
+    "url": "https://github.com/zulanggara"
+  },
+  "plugins": [
+    {
+      "name": "php-upgrade-audit",
+      "source": "./",
+      "description": "Read-only audit of a PHP codebase before a PHP 8.x upgrade, with a standardised HTML report and scan history."
+    }
+  ]
+}

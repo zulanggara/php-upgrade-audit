@@ -1,0 +1,14 @@
+{
+  "name": "php-upgrade-audit",
+  "displayName": "PHP Upgrade Audit",
+  "version": "1.0.0",
+  "description": "Read-only audit of a PHP codebase before a PHP 8.x upgrade (default target 8.5.12, any 8.x target): removed/deprecated/behaviour-changing code, php -l and class-loading proof, Composer libraries, framework comparison, and one HTML report with scan history.",
+  "author": {
+    "name": "Zul Anggara",
+    "url": "https://github.com/zulanggara"
+  },
+  "homepage": "https://github.com/zulanggara/php-upgrade-audit",
+  "repository": "https://github.com/zulanggara/php-upgrade-audit",
+  "license": "MIT",
+  "keywords": ["php", "php8", "upgrade", "migration", "audit", "compatibility", "rector", "phpcompatibility", "codeigniter", "laravel", "symfony", "wordpress"]
+}
