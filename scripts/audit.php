@@ -102,7 +102,8 @@ if ($phpVersion === '') {
 }
 if (targetMinor($phpVersion) !== targetMinor($target)) {
     fwrite(STDERR, "Warning: target is PHP $target but php -l" . (opt($argv, 'load-classes') ? ' and class loading run' : ' runs') . " on PHP $phpVersion.\n"
-        . "         Those results show PHP $phpVersion behaviour. Install the target PHP and use it as php, or pass --php=/path/to/php" . targetMinor($target) . ".\n");
+        . "         Those results show PHP $phpVersion behaviour, and guards such as function_exists()/class_exists() are left as \"?\".\n"
+        . "         Install the target PHP and use it as php, or pass --php=/path/to/php" . targetMinor($target) . ".\n");
 }
 if (version_compare(targetMinor($target), targetMinor(LATEST_TARGET), '>')) {
     fwrite(STDERR, "Warning: the rule catalogue covers changes up to PHP " . targetMinor(LATEST_TARGET) . "; changes made in PHP " . targetMinor($target) . " are not checked by the scanner.\n");
@@ -136,7 +137,10 @@ $report['timings'] = [];
 foreach ($steps as $key => [$script, $args]) {
     fwrite(STDERR, "[$name] $key...\n");
     $t0 = microtime(true);
-    [$code, $stdout, $stderr] = runScript($script, $args);
+    // The scanner evaluates function_exists()/class_exists() guards with the PHP that runs it: use --php when it
+    // can run the scripts (8.1+).
+    $bin = $key === 'scan' && version_compare($phpVersion, '8.1', '>=') ? $php : PHP_BINARY;
+    [$code, $stdout, $stderr] = runScript($script, $args, $bin);
     $report['timings'][$key] = round(microtime(true) - $t0, 2);
     $data = json_decode($stdout, true);
     if (!is_array($data)) {
@@ -208,9 +212,9 @@ function countByLevel(array $report): array
     return $counts;
 }
 
-function runScript(string $script, array $args): array
+function runScript(string $script, array $args, string $php = PHP_BINARY): array
 {
-    $cmd = [PHP_BINARY, __DIR__ . "/$script", ...$args];
+    $cmd = [$php, __DIR__ . "/$script", ...$args];
     $proc = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, sys_get_temp_dir());
     $stdout = stream_get_contents($pipes[1]);
     $stderr = stream_get_contents($pipes[2]);

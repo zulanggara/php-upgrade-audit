@@ -319,6 +319,12 @@ final class Scanner
                 if (isset($consts[$u])) {
                     $expr .= $consts[$u];
                 } elseif (in_array(strtolower($text), $allowedFuncs, true)) {
+                    // function_exists('x'), class_exists('Pdo\\Mysql')... answer for the PHP running the scan, so they
+                    // only say something about the target when that PHP is the target's minor version.
+                    if (!in_array(strtolower($text), ['is_php', 'version_compare'], true)
+                        && PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION !== implode('.', array_slice(explode('.', self::$target), 0, 2))) {
+                        return '?';
+                    }
                     $expr .= strtolower($text) === 'is_php' ? '\\Scanner::isPhp' : '\\' . strtolower($text);
                 } else {
                     return '?';

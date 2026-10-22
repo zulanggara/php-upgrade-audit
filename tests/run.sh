@@ -45,6 +45,16 @@ grep -q '"file": "Collection.php"' "$TMP/spl.json" && fail "->contains() on a co
 grep -q '"file": "Storage.php"' "$TMP/spl.json" || fail "SplObjectStorage::attach() not reported"
 echo "scanner generic methods: ok"
 
+# Guards that depend on the PHP running the scan (function_exists, class_exists...) are only evaluated when that PHP
+# is the target's minor version; otherwise they are "?" (check by hand), never a guess
+mkdir -p "$TMP/guard"
+printf '<?php\nif (function_exists("no_such_function_here")) {\n    each($a);\n}\n' > "$TMP/guard/a.php"
+RUNTIME="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')"
+OTHER="8.5"; [ "$RUNTIME" = "8.5" ] && OTHER="8.4"
+php "$DIR/scripts/scan_code.php" "$TMP/guard" --target="$RUNTIME" | grep -q '"guard_state": "mati"' || fail "guard not evaluated on the target PHP itself"
+php "$DIR/scripts/scan_code.php" "$TMP/guard" --target="$OTHER" | grep -q '"guard_state": "?"' || fail "function_exists() guard evaluated with a PHP that is not the target"
+echo "scanner guards: ok"
+
 # Lint must report the curly-offset parse error
 php "$DIR/scripts/lint.php" "$DIR/fixtures/legacy-app" > "$TMP/lint.json"
 grep -q '"Parse error"' "$TMP/lint.json" || fail "lint did not report the parse error"
