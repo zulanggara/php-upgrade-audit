@@ -54,7 +54,7 @@ It never modifies the audited code and never runs `composer` or Rector in it.
 ## Install
 
 ```bash
-git clone git@github.com:zulanggara/php-upgrade-audit.git
+git clone https://github.com/zulanggara/php-upgrade-audit.git
 cd php-upgrade-audit
 bash scripts/setup.sh        # installs Rector, PHP_CodeSniffer + PHPCompatibility, composer/semver into tools/
 ```
@@ -64,7 +64,7 @@ bash scripts/setup.sh        # installs Rector, PHP_CodeSniffer + PHPCompatibili
 Clone into your skills folder so Claude can load `SKILL.md`:
 
 ```bash
-git clone git@github.com:zulanggara/php-upgrade-audit.git ~/.claude/skills/php-upgrade-audit
+git clone https://github.com/zulanggara/php-upgrade-audit.git ~/.claude/skills/php-upgrade-audit
 bash ~/.claude/skills/php-upgrade-audit/scripts/setup.sh
 ```
 
