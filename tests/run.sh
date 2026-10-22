@@ -122,6 +122,7 @@ if ($d["local_patches"]["changed"] !== ["libraries/Email.php"]) $miss[] = "local
 if (($d["config"][0]["new_keys"] ?? []) !== ["\$config[\x27new_key\x27]"]) $miss[] = "new config key";
 if ($miss) { fwrite(STDERR, "compare_framework missed: " . implode(", ", $miss) . "\n"); exit(1); }
 ' "$TMP/cmp.json" || fail "compare_framework.php did not report the fixture conflicts"
+grep -q '<?phpclass' "$TMP/cmp.json" && fail "local patch diff glues the open tag to the next token"
 php "$DIR/scripts/compare_framework.php" "${CMP[@]}" --adapter=none 2>/dev/null > "$TMP/cmp-generic.json"
 grep -q '"MY_Input"' "$TMP/cmp-generic.json" || fail "generic comparison lost the signature conflict"
 grep -q 'Encrypt.php"' "$TMP/cmp-generic.json" && grep -q '"kind": "file framework dihapus"' "$TMP/cmp-generic.json" && fail "generic comparison used CodeIgniter loader rules"

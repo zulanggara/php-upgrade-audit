@@ -198,7 +198,7 @@ function normalizedSource(string $file): string
             continue;
         }
         if ($id === T_OPEN_TAG) {
-            $text = '<?php';
+            $text = '<?php ';
         }
         $buf .= $text;
         if (in_array($text, [';', '{', '}'], true)) {
