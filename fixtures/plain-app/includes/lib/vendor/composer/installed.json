@@ -1,0 +1,7 @@
+{
+    "packages": [
+        {"name": "example/old-pdf", "version": "1.4.0", "require": {"php": "^5.3 || ^7.0"}, "time": "2017-03-01T00:00:00+00:00", "notification-url": "https://packagist.org/downloads/"},
+        {"name": "example/new-mail", "version": "3.2.0", "require": {"php": "^8.1"}, "time": "2025-02-01T00:00:00+00:00", "notification-url": "https://packagist.org/downloads/"}
+    ],
+    "dev": false
+}

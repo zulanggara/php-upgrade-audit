@@ -58,7 +58,16 @@ $out = ['tool' => 'check_libs', 'target' => $target, 'composer' => false, 'root'
 
 $jsonPath = "$repo/composer.json";
 $lockPath = "$repo/composer.lock";
+$bundled = bundledComposerInstalls($repo);
+$exts = [];
 if (!is_file($jsonPath)) {
+    // No Composer at the root, but libraries may be committed with their own vendor/ (checked below).
+    foreach ($bundled as $b) {
+        foreach ($b['packages'] as $p) {
+            $out['packages'][] = packageRow($p, false, $target, $offline, $cacheDir, $out['errors'], $exts) + ['bundled_in' => $b['path']];
+        }
+    }
+    $out['extensions'] = extensionRows($exts, $target);
     printJson($out);
     exit(0);
 }
@@ -73,7 +82,6 @@ $out['root'] = [
     'has_lock' => is_file($lockPath),
 ];
 
-$exts = [];
 foreach (array_merge($root['require'] ?? [], $root['require-dev'] ?? []) as $name => $c) {
     if (str_starts_with($name, 'ext-')) {
         $exts[substr($name, 4)][] = '(root)';
@@ -89,46 +97,7 @@ if (is_file($lockPath)) {
         }
     }
     foreach ($entries as [$p, $dev]) {
-        $name = $p['name'];
-        foreach ($p['require'] ?? [] as $req => $_) {
-            if (str_starts_with($req, 'ext-')) {
-                $exts[substr($req, 4)][] = $name;
-            }
-        }
-        $php = $p['require']['php'] ?? null;
-        $released = isset($p['time']) ? substr($p['time'], 0, 10) : null;
-        $fromPackagist = str_contains($p['notification-url'] ?? '', 'packagist.org');
-        $row = [
-            'name' => $name,
-            'version' => $p['version'],
-            'dev' => $dev,
-            'php' => $php,
-            'released' => $released,
-            'satisfies' => $php === null ? null : safeSatisfies($target, $php),
-            'source' => $fromPackagist ? 'packagist' : 'lain',
-            'risk' => [],
-            'suggest' => null,
-        ];
-        if ($released !== null && $released < PHP_GA['8.0']) {
-            $row['risk'][] = 'dirilis sebelum PHP 8.0';
-        } elseif ($released !== null && isset(PHP_GA[$targetMinor]) && $released < PHP_GA[$targetMinor]) {
-            $row['risk'][] = "dirilis sebelum PHP $targetMinor";
-        }
-        if ($php !== null && $row['satisfies'] && !preg_match('/[<^~]|\|\|?|-\s/', $php)) {
-            $row['risk'][] = 'constraint terbuka tanpa batas atas';
-        }
-        if (!$fromPackagist) {
-            $row['risk'][] = 'package privat/non-Packagist: cek versi terbaru di repo internal';
-        }
-        if ($fromPackagist && !$offline && ($row['satisfies'] !== true || $row['risk'] !== [])) {
-            $meta = packagistVersions($name, $cacheDir, $out['errors']);
-            if ($meta !== null) {
-                $row['suggest'] = suggest($meta['versions'], $p['version'], $target);
-                $row['abandoned'] = $meta['abandoned'];
-            }
-        }
-        $row['status'] = status($row);
-        $out['packages'][] = $row;
+        $out['packages'][] = packageRow($p, $dev, $target, $offline, $cacheDir, $out['errors'], $exts);
     }
 } else {
     // No lock file: check whether the composer.json constraint still allows a version that supports the target.
@@ -153,18 +122,76 @@ if (is_file($lockPath)) {
     }
 }
 
-ksort($exts);
-foreach ($exts as $ext => $by) {
-    $out['extensions'][] = [
-        'name' => $ext,
-        'required_by' => array_values(array_unique($by)),
-        // Only extensions already gone in the target version (imap is fine on a move to 8.3, gone in 8.4).
-        'removed_in' => isset(REMOVED_EXT[strtolower($ext)]) && appliesTo(REMOVED_EXT[strtolower($ext)], $target) ? REMOVED_EXT[strtolower($ext)] : null,
-        'loaded_locally' => extension_loaded($ext),
-    ];
+foreach ($bundled as $b) {
+    foreach ($b['packages'] as $p) {
+        $out['packages'][] = packageRow($p, false, $target, $offline, $cacheDir, $out['errors'], $exts) + ['bundled_in' => $b['path']];
+    }
 }
+$out['extensions'] = extensionRows($exts, $target);
 
 printJson($out);
+
+function extensionRows(array $exts, string $target): array
+{
+    ksort($exts);
+    $rows = [];
+    foreach ($exts as $ext => $by) {
+        $rows[] = [
+            'name' => $ext,
+            'required_by' => array_values(array_unique($by)),
+            // Only extensions already gone in the target version (imap is fine on a move to 8.3, gone in 8.4).
+            'removed_in' => isset(REMOVED_EXT[strtolower($ext)]) && appliesTo(REMOVED_EXT[strtolower($ext)], $target) ? REMOVED_EXT[strtolower($ext)] : null,
+            'loaded_locally' => extension_loaded($ext),
+        ];
+    }
+    return $rows;
+}
+
+/** One locked (or bundled) package checked against the target; extensions it requires go to $exts. */
+function packageRow(array $p, bool $dev, string $target, bool $offline, string $cacheDir, array &$errors, array &$exts): array
+{
+    $targetMinor = targetMinor($target);
+    $name = $p['name'];
+    foreach ($p['require'] ?? [] as $req => $_) {
+        if (str_starts_with($req, 'ext-')) {
+            $exts[substr($req, 4)][] = $name;
+        }
+    }
+    $php = $p['require']['php'] ?? null;
+    $released = isset($p['time']) ? substr($p['time'], 0, 10) : null;
+    $fromPackagist = str_contains($p['notification-url'] ?? '', 'packagist.org');
+    $row = [
+        'name' => $name,
+        'version' => $p['version'],
+        'dev' => $dev,
+        'php' => $php,
+        'released' => $released,
+        'satisfies' => $php === null ? null : safeSatisfies($target, $php),
+        'source' => $fromPackagist ? 'packagist' : 'lain',
+        'risk' => [],
+        'suggest' => null,
+    ];
+    if ($released !== null && $released < PHP_GA['8.0']) {
+        $row['risk'][] = 'dirilis sebelum PHP 8.0';
+    } elseif ($released !== null && isset(PHP_GA[$targetMinor]) && $released < PHP_GA[$targetMinor]) {
+        $row['risk'][] = "dirilis sebelum PHP $targetMinor";
+    }
+    if ($php !== null && $row['satisfies'] && !preg_match('/[<^~]|\|\|?|-\s/', $php)) {
+        $row['risk'][] = 'constraint terbuka tanpa batas atas';
+    }
+    if (!$fromPackagist) {
+        $row['risk'][] = 'package privat/non-Packagist: cek versi terbaru di repo internal';
+    }
+    if ($fromPackagist && !$offline && ($row['satisfies'] !== true || $row['risk'] !== [])) {
+        $meta = packagistVersions($name, $cacheDir, $errors);
+        if ($meta !== null) {
+            $row['suggest'] = suggest($meta['versions'], $p['version'], $target);
+            $row['abandoned'] = $meta['abandoned'];
+        }
+    }
+    $row['status'] = status($row);
+    return $row;
+}
 
 function safeSatisfies(string $version, string $constraint): ?bool
 {

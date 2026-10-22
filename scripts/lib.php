@@ -182,6 +182,37 @@ function strip_local_paths(mixed $data, array $roots = []): mixed
     );
 }
 
+/**
+ * Composer installs committed into the repo (e.g. a bundled library with its own vendor/), found by their
+ * vendor/composer/installed.json. The root vendor/ is included only when there is no root composer.lock
+ * (otherwise the lock already describes it). Returns [['path' => 'include/mpdf/vendor', 'packages' => [...]], ...].
+ */
+function bundledComposerInstalls(string $repo): array
+{
+    $out = [];
+    $it = new RecursiveIteratorIterator(new RecursiveCallbackFilterIterator(
+        new RecursiveDirectoryIterator($repo, FilesystemIterator::SKIP_DOTS),
+        fn (SplFileInfo $f) => !$f->isLink() && (!$f->isDir() || !in_array($f->getFilename(), ['.git', 'node_modules', '.svn'], true))
+    ));
+    foreach ($it as $f) {
+        if ($f->getFilename() !== 'installed.json' || basename($f->getPath()) !== 'composer' || basename(dirname($f->getPath())) !== 'vendor') {
+            continue;
+        }
+        $vendor = dirname($f->getPath());
+        $rel = substr($vendor, strlen($repo) + 1);
+        if ($rel === 'vendor' && is_file("$repo/composer.lock")) {
+            continue;
+        }
+        $data = json_decode((string) file_get_contents($f->getPathname()), true);
+        $packages = is_array($data) ? ($data['packages'] ?? (array_is_list($data) ? $data : [])) : [];
+        if ($packages !== []) {
+            $out[] = ['path' => $rel, 'packages' => $packages];
+        }
+    }
+    usort($out, fn ($a, $b) => strcmp($a['path'], $b['path']));
+    return $out;
+}
+
 /** All tool output goes through here, so secrets are redacted before anything touches disk or stdout. */
 function writeJson(string $path, array $data): void
 {

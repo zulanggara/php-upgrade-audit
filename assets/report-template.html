@@ -221,7 +221,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       method: ['<b>Code scanner</b>: PHP tokenizer with rules from the official php.net migration guides 7.1 to 8.5. Code guarded by <code>if (PHP_VERSION_ID &lt; ...)</code> or similar is evaluated against the target version.', '<b>Proof from PHP itself</b>: <code>php -l</code> with the target binary on every file, plus loading classes on the target PHP where possible.', '<b>Libraries</b>: the <code>php</code> constraint of every package in <code>composer.lock</code> is matched against the target, plus Packagist metadata. Private packages are never sent to Packagist.', '<b>Cross-checks</b>: PHPCompatibility and Rector <code>--dry-run</code>. The audited repos are never modified.', '<b>Redaction</b>: secrets in snippets, notes and code samples are replaced with «REDACTED» before anything is written.'],
       analystNotes: 'Analyst notes', profile: 'Profile', fw: 'Framework', phpHints: 'PHP version hints', code: 'Code', minified: 'Minified files', thirdParty: 'Non-Composer libraries', git: 'Git', none: 'none', notDetected: 'not detected', notGit: 'not a git repo', fromSrc: 'from', minifiedTxt: (n) => `${n} files; locations are shown as code excerpts.`,
       mustScanner: 'Must fix (scanner)', deadOn: (t) => `not run on ${t}`, lintStat: 'php -l errors', pkgStat: 'Composer packages',
-      libTitle: 'Composer libraries', noComposer: 'This repo does not use Composer.', notSet: 'not set', notAllow: (t) => `does not allow ${t}`, mustChange: (t) => `must be changed to ${t}`, noLock: 'no composer.lock',
+      libTitle: 'Composer libraries', noComposer: 'This repo does not use Composer.', noComposerBundled: 'No Composer at the root; the packages below come from vendor/ folders committed into the repo.', bundledIn: (p) => `bundled in ${p}`, wpHeader: (t, n, v, r) => `WordPress ${t} “${n}” ${v || ''}${r ? ', Requires PHP ' + r : ''}`, notSet: 'not set', notAllow: (t) => `does not allow ${t}`, mustChange: (t) => `must be changed to ${t}`, noLock: 'no composer.lock',
       pkg: 'Package', installed: 'Installed', latestSame: 'Latest in same major', latestCompat: (t) => `Latest supporting ${t}`, notes: 'Notes', abandoned: 'abandoned', replaceWith: 'replace with', dev: 'dev', noPkgs: 'No packages.',
       extTitle: (n) => `PHP extensions required by packages (${n})`, ext: 'Extension', requiredBy: 'Required by', inTarget: 'Status on target PHP', removedSince: (v) => `removed from core since ${v}`, available: 'available',
       findings: 'Code findings', findingsLead: 'Click a row to see the locations. <b>Rector</b>: <i>yes</i> means Rector can fix it automatically in this repo; <i>available</i> means a Rector rule exists.',
@@ -267,7 +267,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       method: ['<b>Scanner kode</b>: tokenizer PHP dengan aturan dari panduan migrasi resmi php.net 7.1 sampai 8.5. Kode yang dijaga <code>if (PHP_VERSION_ID &lt; ...)</code> atau sejenisnya dievaluasi terhadap versi target.', '<b>Bukti dari PHP</b>: <code>php -l</code> dengan binary target ke semua file, plus memuat class di PHP target bila memungkinkan.', '<b>Library</b>: constraint <code>php</code> setiap package di <code>composer.lock</code> dicocokkan dengan versi target, plus metadata Packagist. Package privat tidak pernah dikirim ke Packagist.', '<b>Pembanding</b>: PHPCompatibility dan Rector <code>--dry-run</code>. Repo yang diaudit tidak pernah diubah.', '<b>Penyensoran</b>: rahasia di potongan kode, catatan, dan contoh kode diganti «REDACTED» sebelum apa pun ditulis.'],
       analystNotes: 'Catatan analis', profile: 'Profil', fw: 'Framework', phpHints: 'Petunjuk versi PHP', code: 'Kode', minified: 'File minified', thirdParty: 'Library non-Composer', git: 'Git', none: 'tidak ada', notDetected: 'tidak terdeteksi', notGit: 'bukan repo git', fromSrc: 'dari', minifiedTxt: (n) => `${n} file; lokasi temuan ditampilkan sebagai potongan kode.`,
       mustScanner: 'Wajib diubah (scanner)', deadOn: (t) => `mati di ${t}`, lintStat: 'Error dari php -l', pkgStat: 'Package Composer',
-      libTitle: 'Library Composer', noComposer: 'Repo ini tidak memakai Composer.', notSet: 'tidak diisi', notAllow: (t) => `tidak mengizinkan ${t}`, mustChange: (t) => `harus diubah ke ${t}`, noLock: 'tidak ada composer.lock',
+      libTitle: 'Library Composer', noComposer: 'Repo ini tidak memakai Composer.', noComposerBundled: 'Tidak ada Composer di root; package di bawah berasal dari folder vendor/ yang ter-commit di repo.', bundledIn: (p) => `terbundel di ${p}`, wpHeader: (t, n, v, r) => `WordPress ${t} “${n}” ${v || ''}${r ? ', Requires PHP ' + r : ''}`, notSet: 'tidak diisi', notAllow: (t) => `tidak mengizinkan ${t}`, mustChange: (t) => `harus diubah ke ${t}`, noLock: 'tidak ada composer.lock',
       pkg: 'Package', installed: 'Terpasang', latestSame: 'Terbaru di major sama', latestCompat: (t) => `Terbaru yang mendukung ${t}`, notes: 'Catatan', abandoned: 'abandoned', replaceWith: 'ganti ke', dev: 'dev', noPkgs: 'Tidak ada package.',
       extTitle: (n) => `Ekstensi PHP yang dibutuhkan package (${n})`, ext: 'Ekstensi', requiredBy: 'Dibutuhkan oleh', inTarget: 'Status di PHP target', removedSince: (v) => `dihapus dari core sejak ${v}`, available: 'tersedia',
       findings: 'Temuan kode', findingsLead: 'Klik baris untuk melihat lokasinya. Kolom <b>Rector</b>: <i>ya</i> berarti Rector bisa memperbaiki otomatis di repo ini; <i>tersedia</i> berarti aturan Rector-nya ada.',
@@ -543,7 +543,11 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
     const p = r.profile || {};
     const git = p.git ? `${esc(p.git.branch || '')} @ <span class="mono">${esc(p.git.commit || '')}</span> (${esc(p.git.date || '')})` : esc(T.notGit);
     const hints = (p.php_hints || []).map((h) => `<div><span class="mono">${esc(h.value)}</span> <span class="sub">${esc(T.fromSrc)} ${esc(h.source)}</span></div>`).join('') || `<span class="sub">${esc(T.none)}</span>`;
-    const tp = (p.third_party_dirs || []).map((d) => `<div><span class="mono">${esc(d.dir)}/</span> ${d.entries.slice(0, 12).map((x) => `<span class="tag">${esc(x)}</span>`).join('')}${d.entries.length > 12 ? ` <span class="sub">+${d.entries.length - 12}</span>` : ''}</div>`).join('') || `<span class="sub">${esc(T.none)}</span>`;
+    const bundled = (p.bundled || []).map((b) => `<div><span class="mono">${esc(b.path)}/</span> ${b.kind === 'composer'
+      ? b.packages.slice(0, 12).map((x) => `<span class="tag mono">${esc(x.name)} ${esc(x.version || '')}</span>`).join('') + (b.packages.length > 12 ? ` <span class="sub">+${b.packages.length - 12}</span>` : '')
+      : `<span class="tag">${esc(b.kind)}</span>${b.name ? ` <span class="mono">${esc(b.name)} ${esc(b.version || '')}</span>` : ''}`}</div>`).join('');
+    const wp = p.wordpress ? `<div>${esc(T.wpHeader(p.wordpress.type, p.wordpress.name, p.wordpress.version, p.wordpress.requires_php))}</div>` : '';
+    const tp = wp + bundled + (p.third_party_dirs || []).map((d) => `<div><span class="mono">${esc(d.dir)}/</span> ${d.entries.slice(0, 12).map((x) => `<span class="tag">${esc(x)}</span>`).join('')}${d.entries.length > 12 ? ` <span class="sub">+${d.entries.length - 12}</span>` : ''}</div>`).join('') || `<span class="sub">${esc(T.none)}</span>`;
     const mini = p.minified_files || [];
     const t = r.target || target;
     return `
@@ -580,7 +584,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
   }
 
   function libRootHtml(libs) {
-    if (!libs || !libs.composer) return `<p class="lead">${esc(T.noComposer)}</p>`;
+    if (!libs || !libs.composer) return `<p class="lead">${esc((libs && (libs.packages || []).length) ? T.noComposerBundled : T.noComposer)}</p>`;
     const root = libs.root || {};
     const parts = [`<code>require.php</code> = <span class="mono">${esc(root.php || T.notSet)}</span>${root.allows_target === false ? ' ' + pill('wajib', T.notAllow(libs.target)) : ''}`];
     if (root.platform_php) parts.push(`<code>config.platform.php</code> = <span class="mono">${esc(root.platform_php)}</span> ${pill('wajib', T.mustChange(libs.target))}`);
@@ -588,7 +592,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
     return `<p class="lead">${parts.join(' · ')}</p>`;
   }
   function libTableHtml(libs) {
-    if (!libs || !libs.composer) return '';
+    if (!libs || (!libs.composer && !(libs.packages || []).length)) return '';
     const order = { 'tidak-didukung': 0, 'perlu-upgrade': 1, 'cek-manual': 2, 'aman': 3 };
     const rows = (libs.packages || []).slice().sort((x, y) => (order[x.status] - order[y.status]) || x.name.localeCompare(y.name));
     if (!rows.length) return `<p class="empty">${esc(T.noPkgs)}</p>`;
@@ -600,6 +604,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
         if (p.abandoned) notes.push(`<span class="tag">${esc(T.abandoned)}${typeof p.abandoned === 'string' ? ': ' + esc(T.replaceWith) + ' ' + esc(p.abandoned) : ''}</span>`);
         (p.risk || []).forEach((x) => notes.push(`<span class="tag">${esc(x)}</span>`));
         if (p.dev) notes.push(`<span class="tag">${esc(T.dev)}</span>`);
+        if (p.bundled_in) notes.push(`<span class="tag">${esc(T.bundledIn(p.bundled_in))}</span>`);
         return `<tr><td class="mono">${esc(p.name)}</td><td class="mono">${esc(p.version || p.constraint || '-')}<div class="sub">${esc(p.released || '')}</div></td>
           <td class="mono">${esc(p.php || '-')}</td><td><span class="pill ${LIB_CLASS[p.status] || 's-info'}">${esc(T.lib[p.status] || p.status)}</span></td>
           <td>${sug(s.latest_same_major)}</td><td>${sug(s.latest_compatible)}</td><td>${notes.join('')}</td></tr>`;

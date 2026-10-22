@@ -110,7 +110,60 @@ foreach (['application/third_party', 'application/libraries', 'app/ThirdParty', 
     }
 }
 
+// Libraries committed into the repo: bundled Composer installs (with versions), nested composer.json,
+// WordPress plugins/themes, PEAR. Projects without Composer often carry most of their dependencies this way.
+$profile['bundled'] = [];
+foreach (bundledComposerInstalls($repo) as $b) {
+    $profile['bundled'][] = ['path' => $b['path'], 'kind' => 'composer', 'packages' => array_map(
+        fn ($p) => ['name' => $p['name'] ?? '?', 'version' => $p['version'] ?? null, 'php' => $p['require']['php'] ?? null], $b['packages'])];
+}
+foreach (listFiles($repo, fn ($f) => basename($f) === 'composer.json') as $f) {
+    $rel = substr($f, strlen($repo) + 1);
+    if ($rel !== 'composer.json' && !preg_match('#(^|/)vendor/#', $rel)) {
+        $c = json_decode((string) file_get_contents($f), true) ?? [];
+        $profile['bundled'][] = ['path' => dirname($rel), 'kind' => 'composer.json', 'name' => $c['name'] ?? null, 'version' => $c['version'] ?? null, 'php' => $c['require']['php'] ?? null];
+    }
+}
+foreach (listFiles($repo, fn ($f) => basename($f) === 'PEAR.php') as $f) {
+    $profile['bundled'][] = ['path' => substr(dirname($f), strlen($repo) + 1) ?: '.', 'kind' => 'pear'];
+}
+// WordPress plugin / theme headers: the repo itself (root files) and bundled ones under wp-content/.
+foreach (listFiles($repo, fn ($f) => preg_match('#\.(php|css)$#', $f) && (dirname($f) === $repo || preg_match('#/wp-content/(plugins|themes)/[^/]+/[^/]+$#', $f))) as $f) {
+    $head = (string) file_get_contents($f, false, null, 0, 8192);
+    if (!preg_match('/^[ \t\/*#@]*(Plugin|Theme) Name:\s*(.+)$/mi', $head, $m)) {
+        continue;
+    }
+    $rel = substr($f, strlen($repo) + 1);
+    $version = preg_match('/^[ \t\/*#@]*Version:\s*(\S+)/mi', $head, $v) ? $v[1] : null;
+    $requires = preg_match('/^[ \t\/*#@]*Requires PHP:\s*(\S+)/mi', $head, $r) ? $r[1] : null;
+    if (dirname($f) === $repo) {
+        $profile['wordpress'] = ['type' => strtolower($m[1]), 'name' => trim($m[2]), 'version' => $version, 'requires_php' => $requires, 'file' => $rel];
+        if ($requires !== null) {
+            $profile['php_hints'][] = ['source' => "$rel (Requires PHP)", 'value' => $requires];
+        }
+    } else {
+        $profile['bundled'][] = ['path' => dirname($rel), 'kind' => 'wordpress-' . strtolower($m[1]), 'name' => trim($m[2]), 'version' => $version, 'php' => $requires];
+    }
+}
+
 printJson($profile);
+
+/** Every file under $repo for which $match is true (no symlinks; .git and node_modules skipped). */
+function listFiles(string $repo, callable $match): array
+{
+    $out = [];
+    $it = new RecursiveIteratorIterator(new RecursiveCallbackFilterIterator(
+        new RecursiveDirectoryIterator($repo, FilesystemIterator::SKIP_DOTS),
+        fn (SplFileInfo $f) => !$f->isLink() && (!$f->isDir() || !in_array($f->getFilename(), ['.git', 'node_modules', '.svn'], true))
+    ));
+    foreach ($it as $f) {
+        if ($match($f->getPathname())) {
+            $out[] = $f->getPathname();
+        }
+    }
+    sort($out);
+    return $out;
+}
 
 function gitInfo(string $repo): ?array
 {

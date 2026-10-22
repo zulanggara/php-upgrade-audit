@@ -101,6 +101,17 @@ grep -q '"docker/php/Dockerfile:1"' "$TMP/hints.json" || fail "PHP hint in docke
 grep -q '"value": "7.4"' "$TMP/hints.json" || fail "PHP hint in the CI workflow not found"
 echo "profile: ok"
 
+# Libraries committed into a repo without Composer: found with their versions and checked against the target
+php "$DIR/scripts/detect.php" "$DIR/fixtures/plain-app" > "$TMP/plain-profile.json"
+grep -q '"source": "plugin.php (Requires PHP)"' "$TMP/plain-profile.json" || fail "WordPress Requires PHP header not used as a PHP hint"
+grep -q '"path": "includes/lib/vendor"' "$TMP/plain-profile.json" || fail "committed Composer install not listed"
+if [ -f "$DIR/tools/vendor/autoload.php" ]; then
+  php "$DIR/scripts/check_libs.php" "$DIR/fixtures/plain-app" --offline > "$TMP/plain-libs.json"
+  php -r '$p = array_column(json_decode(file_get_contents($argv[1]), true)["packages"], "status", "name");
+  exit($p === ["example/old-pdf" => "tidak-didukung", "example/new-mail" => "aman"] ? 0 : 1);' "$TMP/plain-libs.json" || fail "bundled packages not checked: $(head -c 400 "$TMP/plain-libs.json")"
+fi
+echo "bundled libraries: ok"
+
 # Library status: an open constraint alone is not a reason to check by hand; a pre-PHP-8.0 release is
 if [ -f "$DIR/tools/vendor/autoload.php" ]; then
   mkdir -p "$TMP/libs"
