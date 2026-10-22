@@ -231,7 +231,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       rtSum: (p, l, u, f, x, d) => `Runtime proof on PHP ${p} (class loading): ${l} of ${u} loaded, ${f} failed, ${x} unresolved, ${d} deprecation(s)`,
       rtMode: { composer: 'Composer autoload in a scratch copy', files: 'files that only declare classes or functions (no Composer)' },
       rtFailed: 'Fail to load on this PHP', rtUnresolved: 'Need code that is not in the repo or not installed (not a PHP problem by itself)', rtDeps: 'Deprecations while linking classes',
-      rtSkipped: (n) => `${n} file(s) not loaded because they run code when included`, rtPlatform: 'composer.lock does not install on the target PHP without ignoring its php requirement', rtUnit: 'Class / file', rtMissing: 'Missing', rtWhere: 'Where', rtNothing: 'Nothing to load.',
+      rtSkipped: (n) => `${n} file(s) not loaded because they run code when included`, rtLibDeps: 'Deprecations raised by the code itself (E_USER_DEPRECATED), not by PHP', rtPlatform: 'composer.lock does not install on the target PHP without ignoring its php requirement', rtUnit: 'Class / file', rtMissing: 'Missing', rtWhere: 'Where', rtNothing: 'Nothing to load.',
       lintSum: (p, e, d, f) => `Proof from PHP ${p} (php -l): ${e} error(s), ${d} deprecation(s) in ${f} files`, lintFail: 'Lint failed to run.', noLintErr: 'No parse or fatal errors.', parseErr: 'Parse / fatal errors', compileDep: 'Compile-time deprecations',
       pcSum: (v, n, k) => `PHPCompatibility (testVersion ${v}): ${n} message(s), ${k} kind(s)`, pcFail: 'PHPCompatibility: failed to run', sniff: 'Sniff', type: 'Type', example: 'Example', noMsg: 'No messages.',
       rcSum: (s, n) => `Rector ${s} (dry-run): ${n} file(s) can be changed automatically`, rcFail: 'Rector: failed to run', rcNote: 'This set also contains optional modernisation, e.g. array() to []. Not every change is required for compatibility.', rcRule: 'Rector rule', noChange: 'No changes.',
@@ -277,7 +277,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       rtSum: (p, l, u, f, x, d) => `Bukti runtime di PHP ${p} (memuat class): ${l} dari ${u} termuat, ${f} gagal, ${x} belum terselesaikan, ${d} deprecation`,
       rtMode: { composer: 'autoload Composer di salinan sementara', files: 'file yang hanya mendeklarasikan class atau fungsi (tanpa Composer)' },
       rtFailed: 'Gagal dimuat di PHP ini', rtUnresolved: 'Butuh kode yang tidak ada di repo atau belum terpasang (bukan masalah PHP dengan sendirinya)', rtDeps: 'Deprecation saat class di-link',
-      rtSkipped: (n) => `${n} file tidak dimuat karena menjalankan kode saat di-include`, rtPlatform: 'composer.lock tidak bisa dipasang di PHP target tanpa mengabaikan syarat php-nya', rtUnit: 'Class / file', rtMissing: 'Yang hilang', rtWhere: 'Lokasi', rtNothing: 'Tidak ada yang dimuat.',
+      rtSkipped: (n) => `${n} file tidak dimuat karena menjalankan kode saat di-include`, rtLibDeps: 'Deprecation dari kode itu sendiri (E_USER_DEPRECATED), bukan dari PHP', rtPlatform: 'composer.lock tidak bisa dipasang di PHP target tanpa mengabaikan syarat php-nya', rtUnit: 'Class / file', rtMissing: 'Yang hilang', rtWhere: 'Lokasi', rtNothing: 'Tidak ada yang dimuat.',
       lintSum: (p, e, d, f) => `Bukti dari PHP ${p} (php -l): ${e} error, ${d} deprecation dari ${f} file`, lintFail: 'Lint gagal dijalankan.', noLintErr: 'Tidak ada parse error atau fatal error.', parseErr: 'Parse / fatal error', compileDep: 'Deprecation saat kompilasi',
       pcSum: (v, n, k) => `PHPCompatibility (testVersion ${v}): ${n} pesan, ${k} jenis`, pcFail: 'PHPCompatibility: gagal dijalankan', sniff: 'Sniff', type: 'Tipe', example: 'Contoh', noMsg: 'Tidak ada pesan.',
       rcSum: (s, n) => `Rector ${s} (dry-run): ${n} file bisa diubah otomatis`, rcFail: 'Rector: gagal dijalankan', rcNote: 'Set ini juga berisi modernisasi opsional, misalnya array() menjadi []. Tidak semua perubahan wajib untuk kompatibilitas.', rcRule: 'Aturan Rector', noChange: 'Tidak ada perubahan.',
@@ -632,6 +632,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       ${failed.length ? `<h3>${esc(T.rtFailed)}</h3>${rows(failed, false)}` : ''}
       ${deps.length ? `<h3>${esc(T.rtDeps)}</h3><ul class="hits">${deps.slice(0, 300).map((x) => `<li><span class="loc">${esc(x.where)} · ×${x.count}</span><code>${esc(x.message)}</code></li>`).join('')}</ul>` : ''}
       ${unres.length ? `<h3>${esc(T.rtUnresolved)}</h3>${rows(unres, true)}` : ''}
+      ${(rt.library_deprecations || []).length ? `<h3>${esc(T.rtLibDeps)}</h3><ul class="hits">${rt.library_deprecations.slice(0, 100).map((x) => `<li><span class="loc">${esc(x.where)} · ×${x.count}</span><code>${esc(x.message)}</code></li>`).join('')}</ul>` : ''}
       ${(rt.skipped || []).length ? `<p class="sub">${esc(T.rtSkipped(rt.skipped.length))}</p>` : ''}
       ${!rt.units ? `<p class="empty">${esc(T.rtNothing)}</p>` : ''}</div></details>`;
   }

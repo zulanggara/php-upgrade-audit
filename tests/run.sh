@@ -209,8 +209,9 @@ if command -v composer > /dev/null 2>&1; then
   php -r '
   $d = json_decode(file_get_contents($argv[1]), true);
   $ok = $d["mode"] === "composer" && array_column($d["failed"], "type", "unit") === ["App\\Model\\Report" => "signature"]
-     && array_column($d["unresolved"], "missing") === ["Vendor\\Sdk\\BasePlugin"]
-     && str_contains($d["deprecations"][0]["message"] ?? "", "Counter::count()") && $d["loaded"] === 3;
+     && array_column($d["unresolved"], "missing", "unit") === ["App\\Model\\Optional" => "acme/missing", "App\\Model\\Plugin" => "Vendor\\Sdk\\BasePlugin"]
+     && count($d["deprecations"]) === 1 && str_contains($d["deprecations"][0]["message"], "Counter::count()")
+     && str_contains($d["library_deprecations"][0]["message"] ?? "", "OldApi") && $d["loaded"] === 4;
   if (!$ok) { fwrite(STDERR, json_encode($d, JSON_PRETTY_PRINT)); exit(1); }' "$TMP/rt.json" || fail "composer mode did not classify the fixture classes"
   [ -d "$DIR/fixtures/composer-app/vendor" ] && fail "load_classes.php installed into the audited repo"
   echo "load classes (composer): ok"

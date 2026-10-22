@@ -78,7 +78,7 @@ $dev = opt($argv, 'dev') !== null;
 $vendorOnly = opt($argv, 'vendor-only') !== null;
 
 $out = ['tool' => 'load_classes', 'php' => $phpVersion, 'mode' => null, 'install' => null, 'units' => 0, 'loaded' => 0,
-    'failed' => [], 'unresolved' => [], 'deprecations' => [], 'warnings' => [], 'skipped' => [], 'notes' => []];
+    'failed' => [], 'unresolved' => [], 'deprecations' => [], 'library_deprecations' => [], 'warnings' => [], 'skipped' => [], 'notes' => []];
 
 $adapterName = opt($argv, 'adapter');
 if ($adapterName !== null) {
@@ -158,12 +158,26 @@ if ($out['mode'] === 'composer') {
     }
 }
 collect($out, runUnits($units, $jobs, $timeout), [$work => '']);
+if ($out['mode'] === 'composer' && !$dev && $out['unresolved'] !== [] && !empty($composerJson['require-dev'])) {
+    $out['notes'][] = 'require-dev packages were not installed, so classes that need them (fixtures, tests) show as unresolved; add --dev to include them.';
+}
 finish($out);
 
 // ---------------------------------------------------------------------------------------------
 
 function finish(array $out): never
 {
+    // Processes finish in any order: sort so the same repo always gives the same JSON.
+    foreach (['failed', 'unresolved', 'skipped'] as $k) {
+        usort($out[$k], fn ($a, $b) => [$a['unit'] ?? $a['file'], $a['file'] ?? ''] <=> [$b['unit'] ?? $b['file'], $b['file'] ?? '']);
+    }
+    foreach (['deprecations', 'library_deprecations', 'warnings'] as $k) {
+        usort($out[$k], fn ($a, $b) => [$a['where'], $a['message']] <=> [$b['where'], $b['message']]);
+        foreach ($out[$k] as &$x) {
+            sort($x['examples']);
+        }
+        unset($x);
+    }
     $out['failed_count'] = count($out['failed']);
     $out['unresolved_count'] = count($out['unresolved']);
     printJson(strip_local_paths($out));
@@ -497,12 +511,16 @@ function collect(array &$out, array $results, array $roots): void
         }
         return $s;
     };
-    $agg = ['deprecations' => [], 'warnings' => []];
+    $agg = ['deprecations' => [], 'library_deprecations' => [], 'warnings' => []];
     foreach ($results as $r) {
         $out['units']++;
         foreach ($r['msgs'] ?? [] as $m) {
             // The same message from a shared parent shows up for every child class: keep it once, with a count.
-            $bucket = str_contains($m['type'], 'deprecat') ? 'deprecations' : 'warnings';
+            $bucket = match ($m['type']) {
+                'deprecated' => 'deprecations',
+                'user-deprecated' => 'library_deprecations',
+                default => 'warnings',
+            };
             $key = $m['msg'] . '|' . $short($m['where']);
             $agg[$bucket][$key] ??= ['message' => $short($m['msg']), 'where' => $short($m['where']), 'count' => 0, 'examples' => []];
             $agg[$bucket][$key]['count']++;
@@ -518,6 +536,9 @@ function collect(array &$out, array $results, array $roots): void
         $row = ['unit' => $r['id'], 'file' => $short($r['file'] ?? null), 'type' => $r['type'] ?? 'fatal', 'message' => $msg, 'where' => $short($r['where'] ?? null)];
         if (preg_match('/(?:Class|Interface|Trait|Enum) "?([\\\\\w]+)"? not found/i', $msg, $m)) {
             $out['unresolved'][] = $row + ['missing' => ltrim($m[1], '\\')];
+        } elseif (preg_match('#"([a-z0-9_.-]+/[a-z0-9_.-]+)" package is not installed|composer require ([a-z0-9_.-]+/[a-z0-9_.-]+)#i', $msg, $m)) {
+            // Optional dependency: the library refuses to load without a package (Symfony, Laminas, ...).
+            $out['unresolved'][] = $row + ['missing' => $m[1] !== '' ? $m[1] : $m[2]];
         } else {
             $row['type'] = match (true) {
                 $row['type'] === 'timeout' => 'timeout',
@@ -529,6 +550,7 @@ function collect(array &$out, array $results, array $roots): void
         }
     }
     $out['deprecations'] = array_values($agg['deprecations']);
+    $out['library_deprecations'] = array_values($agg['library_deprecations']);
     $out['warnings'] = array_values($agg['warnings']);
 }
 
@@ -546,7 +568,8 @@ function child(array $a): never
     $GLOBALS['__done'] = false;
     set_error_handler(function (int $no, string $str, string $file, int $line): bool {
         $type = match ($no) {
-            E_DEPRECATED, E_USER_DEPRECATED => 'deprecated',
+            E_DEPRECATED => 'deprecated',
+            E_USER_DEPRECATED => 'user-deprecated', // raised by library code (trigger_error), not by PHP
             E_WARNING, E_USER_WARNING, E_CORE_WARNING, E_COMPILE_WARNING => 'warning',
             default => 'notice',
         };
