@@ -24,6 +24,8 @@
  *   special      check                    custom check implemented in scan_code.php
  * Optional argument filters for func/method: argc => ['<', 5], arg_token => [...],
  *   arg_string => ['index' => 0|'any', 'values' => [...]], arg_is_string => index
+ * Optional for method: only_if_mentioned => 'ClassName' (the rule only applies in files that mention the class,
+ *   for generic names such as ->contains()).
  * Optional: rector => name of the Rector rule that fixes it (shown in the report).
  */
 
@@ -233,7 +235,7 @@ return [
         'title' => 'Method driver di class PDO deprecated', 'fix' => 'Pakai Pdo\Pgsql / Pdo\Sqlite (PDO::connect()) dan method barunya.', 'ref' => MIG . 'migration85.deprecated.php'],
     ['id' => 'P85-SET-ACCESSIBLE', 'sev' => 'deprecated', 'ver' => '8.5', 'conf' => 'sedang', 'kind' => 'method', 'names' => ['setAccessible'],
         'title' => 'Reflection*::setAccessible() deprecated (tidak berefek sejak 8.1)', 'fix' => 'Hapus pemanggilannya.', 'ref' => MIG . 'migration85.deprecated.php'],
-    ['id' => 'P85-SPLOBJECTSTORAGE', 'sev' => 'deprecated', 'ver' => '8.5', 'conf' => 'rendah', 'kind' => 'method', 'names' => ['attach', 'detach', 'contains'],
+    ['id' => 'P85-SPLOBJECTSTORAGE', 'sev' => 'deprecated', 'ver' => '8.5', 'conf' => 'rendah', 'kind' => 'method', 'names' => ['attach', 'detach', 'contains'], 'only_if_mentioned' => 'SplObjectStorage',
         'title' => 'SplObjectStorage::attach()/detach()/contains() deprecated', 'fix' => 'Jika object-nya SplObjectStorage: offsetSet()/offsetUnset()/offsetExists(). Abaikan jika class lain.', 'ref' => MIG . 'migration85.deprecated.php'],
     ['id' => 'P85-SLEEP-WAKEUP', 'sev' => 'info', 'ver' => '8.5', 'conf' => 'tinggi', 'kind' => 'special', 'check' => 'sleep_wakeup',
         'title' => '__sleep()/__wakeup() soft-deprecated', 'fix' => 'Belum memunculkan warning. Rencanakan pindah ke __serialize()/__unserialize().', 'ref' => MIG . 'migration85.deprecated.php'],

@@ -36,6 +36,15 @@ for rule in P84-IMPLICIT-NULLABLE P84-CSV-ESCAPE P85-BACKTICK P85-CAST-NAME P85-
 done
 echo "scanner target: ok"
 
+# Generic method names: SplObjectStorage::contains() only counts where SplObjectStorage is used at all
+mkdir -p "$TMP/spl"
+printf '<?php\nclass Post { public function add($c) { if (!$this->comments->contains($c)) { $this->comments->add($c); } } }\n' > "$TMP/spl/Collection.php"
+printf '<?php\n$s = new SplObjectStorage();\n$s->attach(new stdClass());\n' > "$TMP/spl/Storage.php"
+php "$DIR/scripts/scan_code.php" "$TMP/spl" > "$TMP/spl.json"
+grep -q '"file": "Collection.php"' "$TMP/spl.json" && fail "->contains() on a collection reported as SplObjectStorage"
+grep -q '"file": "Storage.php"' "$TMP/spl.json" || fail "SplObjectStorage::attach() not reported"
+echo "scanner generic methods: ok"
+
 # Lint must report the curly-offset parse error
 php "$DIR/scripts/lint.php" "$DIR/fixtures/legacy-app" > "$TMP/lint.json"
 grep -q '"Parse error"' "$TMP/lint.json" || fail "lint did not report the parse error"

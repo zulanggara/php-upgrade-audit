@@ -75,6 +75,7 @@ final class Scanner
     private array $all = [];
     private array $lines = [];
     private string $file = '';
+    private string $codeLower = '';
     /** Index (in $sig) of the token being reported, for the code excerpt. */
     private int $at = 0;
 
@@ -113,6 +114,7 @@ final class Scanner
     {
         $code = (string) file_get_contents($path);
         $this->file = $rel;
+        $this->codeLower = strtolower($code);
         $this->lines = preg_split('/\R/', $code) ?: [];
         $this->tokenize($code);
         $this->scanTokens();
@@ -677,6 +679,10 @@ final class Scanner
         $name = strtolower($this->text($i));
         [$args, , $spread] = $this->parseArgs($i + 1);
         foreach ($this->byKind['method'] ?? [] as $r) {
+            // A generic name (->contains()) only counts in files that use the class at all.
+            if (isset($r['only_if_mentioned']) && !str_contains($this->codeLower, strtolower($r['only_if_mentioned']))) {
+                continue;
+            }
             if (in_array($name, array_map('strtolower', $r['names']), true) && $this->argMatches($r, $args, $spread)) {
                 $this->add($r['id'], $this->sig[$i][2]);
             }
