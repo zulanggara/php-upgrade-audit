@@ -11,10 +11,20 @@ require __DIR__ . '/lib.php';
 
 const MAX_FILE_BYTES = 2_000_000;
 
+handleHelp($argv, <<<'HELP'
+Tokenizer-based scanner for removed, deprecated and behaviour-changing PHP features (7.1 -> 8.5).
+Reads files only, never runs them. Normally called by audit.php.
+
+Usage: php scripts/scan_code.php <repo> [--target=8.5.12] [--exclude=a,b] > scan.json
+
+  --target   PHP version you move to (default: latest covered). Rules from later versions are skipped,
+             and version checks in the code (PHP_VERSION_ID, is_php(), version_compare) are evaluated with it.
+  --exclude  Extra folders to skip; vendor, node_modules, .git and cache folders are always skipped.
+HELP);
+
 $repo = $argv[1] ?? '';
 if ($repo === '' || !is_dir($repo)) {
-    fwrite(STDERR, "Usage: php scan_code.php <repo> [--exclude=dir1,dir2]\n");
-    exit(2);
+    usageError($repo === '' ? 'no repo given.' : "repo folder not found: $repo", 'scripts/scan_code.php');
 }
 $repo = rtrim(realpath($repo), '/');
 $excludes = excludesFrom($argv);

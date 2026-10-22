@@ -22,11 +22,30 @@ ini_set('display_errors', 'stderr');
 require __DIR__ . '/lib.php';
 require __DIR__ . '/history.php';
 
+handleHelp($argv, <<<'HELP'
+Render the whole history store into ONE self-contained HTML report: a page per repo and comparison, every
+scan version selectable (latest by default), a dashboard and the analyst notes. Everything is redacted again.
+
+Usage:
+  php scripts/render.php --store=<store> --out=<file.html> [--lang=en|id] [--title="..."]
+                         [--include=glob,glob] [--hide=name,name] [--url=<published link>] [--offline]
+
+  --include  Only these entities get a page (glob on the name, e.g. "shop-*"); others stay as data.
+  --hide     Keep as data (e.g. for comparison tables) but no page.
+  --url      Published link, used by the "Copy link" buttons (local pages use their own address).
+  --offline  No external request at all (drops the web font link; system fonts are used).
+
+Notes and overview are checked with validate_notes.php first; problems are printed as warnings.
+Open the result in a browser, or: php -S 127.0.0.1:8085 -t <store>  and visit /report.html
+HELP);
+
 $store = opt($argv, 'store');
 $outFile = opt($argv, 'out');
-if ($store === null || !is_dir($store) || $outFile === null) {
-    fwrite(STDERR, "Usage: php render.php --store=<OUT> --out=<file.html> [--lang=en|id] [--include=glob] [--hide=a,b] [--url=...] [--offline]\n");
-    exit(2);
+if ($store === null || $store === '1' || !is_dir($store)) {
+    usageError('--store=<store> is missing or not a folder (the --out folder you gave audit.php).', 'scripts/render.php');
+}
+if ($outFile === null || $outFile === '1') {
+    usageError('--out=<file.html> is required.', 'scripts/render.php');
 }
 $store = realpath($store);
 $lang = opt($argv, 'lang', 'en') === 'id' ? 'id' : 'en';

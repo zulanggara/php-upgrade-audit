@@ -24,6 +24,40 @@ function opt(array $argv, string $name, ?string $default = null): ?string
     return $default;
 }
 
+/**
+ * Exit codes shared by every script:
+ *   0 ok, 1 wrong usage, 2 environment problem (e.g. analysis tools not installed),
+ *   10 audit.php --fail-on: findings at or above that level.
+ */
+const EXIT_USAGE = 1;
+const EXIT_ENV = 2;
+const EXIT_FINDINGS = 10;
+
+/** Print $help to stdout and exit 0 when --help or -h is given. */
+function handleHelp(array $argv, string $help): void
+{
+    if (array_intersect(['--help', '-h', 'help'], array_slice($argv, 1)) !== []) {
+        echo trim($help), "\n";
+        exit(0);
+    }
+}
+
+/** Wrong usage: print the problem and how to get help, exit 1. */
+function usageError(string $message, string $script): never
+{
+    fwrite(STDERR, "Error: $message\nRun: php $script --help\n");
+    exit(EXIT_USAGE);
+}
+
+/** Folder of the analysis tools (Rector, phpcs, composer/semver) or null when setup.sh was not run. */
+function toolsVendor(): ?string
+{
+    $dir = dirname(__DIR__) . '/tools/vendor';
+    return is_file("$dir/autoload.php") ? $dir : null;
+}
+
+const SETUP_HINT = 'The analysis tools are not installed. Run once: bash scripts/setup.sh (from the php-upgrade-audit folder).';
+
 /** Absolute, normalised path of $path without creating it (the nearest existing parent is resolved). */
 function absPath(string $path): string
 {

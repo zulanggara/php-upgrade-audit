@@ -10,12 +10,20 @@ declare(strict_types=1);
 
 ini_set('display_errors', 'stderr');
 require __DIR__ . '/lib.php';
-$autoload = __DIR__ . '/../tools/vendor/autoload.php';
-if (!is_file($autoload)) {
-    fwrite(STDERR, "tools/vendor is missing. Run: composer install -d " . dirname(__DIR__) . "/tools\n");
-    exit(3);
-}
-require $autoload;
+handleHelp($argv, <<<'HELP'
+Check the Composer libraries of a repo against the target PHP version. Reads composer.json/composer.lock only.
+
+Usage: php scripts/check_libs.php <repo> [--target=8.5.12] [--cache=<dir>] [--offline] > libs.json
+
+  For every locked package: its "php" constraint vs the target, release date, abandoned flag, and (from
+  repo.packagist.org, public packages only) the latest version in the same major and the latest version that
+  supports the target. Extensions required by packages that were removed from PHP are listed too.
+  Without composer.lock the composer.json constraints are checked. Without composer.json the result is empty.
+
+  --target   PHP version you move to (default: latest covered).
+  --cache    Folder for Packagist metadata (cached for 24 h).
+  --offline  No network request; only the lock file is used.
+HELP);
 
 use Composer\Semver\Semver;
 use Composer\Semver\VersionParser;
@@ -28,9 +36,13 @@ const REMOVED_EXT = ['mysql' => '7.0', 'ereg' => '7.0', 'mssql' => '7.0', 'sybas
 
 $repo = $argv[1] ?? '';
 if ($repo === '' || !is_dir($repo)) {
-    fwrite(STDERR, "Usage: php check_libs.php <repo> [--target=8.5.12] [--cache=<dir>] [--offline]\n");
-    exit(2);
+    usageError($repo === '' ? 'no repo given.' : "repo folder not found: $repo", 'scripts/check_libs.php');
 }
+if (toolsVendor() === null) {
+    fwrite(STDERR, "Error: " . SETUP_HINT . "\n");
+    exit(EXIT_ENV);
+}
+require toolsVendor() . '/autoload.php';
 $target = targetFrom($argv);
 $cacheDir = sys_get_temp_dir() . '/php-upgrade-audit-packagist';
 $offline = false;

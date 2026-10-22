@@ -10,11 +10,26 @@ declare(strict_types=1);
 ini_set('display_errors', 'stderr');
 require __DIR__ . '/lib.php';
 
+handleHelp($argv, <<<'HELP'
+Run PHPCompatibility (phpcs) and Rector --dry-run on a repo. Config and caches go to --out, never into the
+repo; Rector never runs without --dry-run. Normally called by audit.php.
+
+Usage: php scripts/run_tools.php <repo> --out=<dir> [--cache=<dir>] [--target=8.5.12] [--only=phpcompat|rector]
+                                 [--exclude=a,b] [--memory=2G]
+
+  --out     Folder for phpcompat.json, rector.json and the generated Rector config.
+  --only    Run one tool only.
+  --memory  memory_limit for both tools (default 2G). Raise it when Rector stops with "Allowed memory size".
+HELP);
+
 $repo = $argv[1] ?? '';
 $outDir = opt($argv, 'out');
 if ($repo === '' || !is_dir($repo) || $outDir === null) {
-    fwrite(STDERR, "Usage: php run_tools.php <repo> --out=<dir> [--target=8.5.12] [--only=phpcompat|rector]\n");
-    exit(2);
+    usageError($repo === '' || !is_dir($repo) ? 'no repo folder given.' : '--out=<dir> is required.', 'scripts/run_tools.php');
+}
+if (toolsVendor() === null) {
+    fwrite(STDERR, "Error: " . SETUP_HINT . "\n");
+    exit(EXIT_ENV);
 }
 $repo = rtrim(realpath($repo), '/');
 @mkdir($outDir, 0700, true);
@@ -23,12 +38,13 @@ $target = targetFrom($argv);
 $minor = targetMinor($target);
 $only = opt($argv, 'only');
 $excludes = excludesFrom($argv);
+$memory = opt($argv, 'memory', '2G');
 $bin = realpath(__DIR__ . '/../tools/vendor/bin');
 
 if ($only === null || $only === 'phpcompat') {
     // Absolute patterns relative to the repo, so a repo whose own path contains "/vendor/" is still scanned.
     $ignore = implode(',', array_map(fn ($e) => "$repo/$e/*", $excludes));
-    $cmd = [PHP_BINARY, '-d', 'memory_limit=2G', "$bin/phpcs", '--standard=PHPCompatibility', '--runtime-set', 'testVersion', $minor,
+    $cmd = [PHP_BINARY, '-d', 'memory_limit=' . $memory, "$bin/phpcs", '--standard=PHPCompatibility', '--runtime-set', 'testVersion', $minor,
         '--extensions=' . implode(',', PHP_EXTS), "--ignore=$ignore", '--report=json', '-q', '--no-cache', '--parallel=8', $repo];
     [$code, $stdout, $stderr] = run($cmd, $outDir);
     $raw = json_decode($stdout, true);
@@ -71,7 +87,7 @@ if ($only === null || $only === 'rector') {
         ->withCache($cacheLit);
     PHP;
     file_put_contents("$outDir/rector-audit.php", $config);
-    $cmd = [PHP_BINARY, '-d', 'memory_limit=2G', "$bin/rector", 'process', '--dry-run', '--config=' . "$outDir/rector-audit.php",
+    $cmd = [PHP_BINARY, '-d', 'memory_limit=' . $memory, "$bin/rector", 'process', '--dry-run', '--config=' . "$outDir/rector-audit.php",
         '--output-format=json', '--no-progress-bar'];
     [$code, $stdout, $stderr] = run($cmd, $outDir);
     $raw = json_decode(substr($stdout, (int) strpos($stdout, '{')), true);
@@ -91,6 +107,7 @@ if ($only === null || $only === 'rector') {
         'set' => $constant,
         'ok' => is_array($raw),
         'stderr' => $raw === null ? substr($stderr . $stdout, 0, 2000) : null,
+        'hint' => $raw === null && str_contains($stderr . $stdout, 'Allowed memory size') ? "Rector ran out of memory ($memory). Re-run audit.php with --memory=4G (or more), or --skip=rector." : null,
         'changed_files' => $raw['totals']['changed_files'] ?? count($files),
         'errors' => array_map(fn ($e) => ['file' => isset($e['file']) ? str_replace($repo . '/', '', $e['file']) : null, 'message' => $e['message'] ?? ''], $raw['errors'] ?? []),
         'by_rule' => $byRule,

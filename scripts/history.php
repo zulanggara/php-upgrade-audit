@@ -150,9 +150,15 @@ if (realpath($argv[0] ?? '') === __FILE__) {
     ini_set('display_errors', 'stderr');
     $cmd = $argv[1] ?? '';
     $out = $argv[2] ?? '';
+    handleHelp($argv, <<<'HELP'
+    History store helpers.
+
+    Usage:
+      php scripts/history.php list <store>      list repos/comparisons and their scans
+      php scripts/history.php migrate <store>   move old flat output (<store>/<name>/report.json) into scans/
+    HELP);
     if (!in_array($cmd, ['list', 'migrate'], true) || $out === '' || !is_dir($out)) {
-        fwrite(STDERR, "Usage: php history.php list|migrate <OUT>\n");
-        exit(2);
+        usageError('expected: list|migrate <store>.', 'scripts/history.php');
     }
     if ($cmd === 'migrate') {
         foreach (history_migrate($out) as $m) {

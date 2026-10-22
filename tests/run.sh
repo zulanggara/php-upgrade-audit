@@ -58,8 +58,21 @@ for lang in en id; do
 done
 echo "render: ok"
 
-# An output folder inside the repo is refused before anything is created there
-php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$DIR/fixtures/legacy-app/out" > /dev/null 2>&1 && fail "output inside the repo was accepted"
-[ -d "$DIR/fixtures/legacy-app/out" ] && { rm -rf "$DIR/fixtures/legacy-app/out"; fail "audit created a folder inside the repo"; }
-echo "read-only repo: ok"
+# First run: --help everywhere, exit codes, --fail-on, PHP version warning
+for s in audit scan_code lint check_libs run_tools detect compare_framework render validate_notes load_classes; do
+  [ -f "$DIR/scripts/$s.php" ] || continue
+  php "$DIR/scripts/$s.php" --help > "$TMP/help.txt" || fail "$s.php --help did not exit 0"
+  grep -q 'Usage' "$TMP/help.txt" || fail "$s.php --help has no usage line"
+done
+set +e
+php "$DIR/scripts/audit.php" > /dev/null 2>&1; [ $? = 1 ] || fail "audit.php without arguments must exit 1"
+php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$DIR/fixtures/legacy-app/out" > /dev/null 2>&1; [ $? = 1 ] || fail "output inside the repo must exit 1"
+php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$TMP/x" --target=nine > /dev/null 2>&1; [ $? = 1 ] || fail "invalid --target must exit 1"
+php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$TMP/ci" --skip=rector,phpcompat,libs --offline --fail-on=wajib > /dev/null 2>&1; [ $? = 10 ] || fail "--fail-on=wajib must exit 10 on the fixture"
+php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app/src/Clean" --out="$TMP/ci" --name=clean --skip=rector,phpcompat,libs --offline --fail-on=perilaku > /dev/null 2>&1; [ $? = 0 ] || fail "--fail-on on clean code must exit 0"
+php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$TMP/ci" --skip=rector,phpcompat,libs --offline --target=7.4 2> "$TMP/warn.txt" > /dev/null
+set -e
+grep -q 'Warning: target is PHP 7.4' "$TMP/warn.txt" || fail "no warning when the PHP running the audit is not the target"
+[ -d "$DIR/fixtures/legacy-app/out" ] && fail "audit created a folder inside the repo"
+echo "first run: ok"
 echo "all tests passed"

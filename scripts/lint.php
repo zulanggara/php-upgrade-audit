@@ -10,16 +10,29 @@ declare(strict_types=1);
 ini_set('display_errors', 'stderr');
 require __DIR__ . '/lib.php';
 
+handleHelp($argv, <<<'HELP'
+Run "php -l" on every PHP file with the given PHP binary: parse errors and compile-time deprecations.
+php -l only compiles, it never executes the code. Normally called by audit.php.
+
+Usage: php scripts/lint.php <repo> [--php=/path/to/php] [--jobs=8] [--exclude=a,b] > lint.json
+
+  --php   PHP binary to lint with; use the TARGET version (default: the PHP running this script).
+  --jobs  Parallel processes (default 8).
+HELP);
+
 $repo = $argv[1] ?? '';
 if ($repo === '' || !is_dir($repo)) {
-    fwrite(STDERR, "Usage: php lint.php <repo> [--php=/path/php] [--jobs=8]\n");
-    exit(2);
+    usageError($repo === '' ? 'no repo given.' : "repo folder not found: $repo", 'scripts/lint.php');
 }
 $repo = rtrim(realpath($repo), '/');
 $php = opt($argv, 'php', PHP_BINARY);
 $jobs = max(1, (int) opt($argv, 'jobs', '8'));
 $files = listPhpFiles($repo, excludesFrom($argv));
-$version = trim((string) shell_exec(escapeshellarg($php) . ' -r "echo PHP_VERSION;"'));
+$version = trim((string) shell_exec(escapeshellarg($php) . ' -r "echo PHP_VERSION;" 2>/dev/null'));
+if ($version === '') {
+    fwrite(STDERR, "Error: cannot run the PHP binary $php (--php).\n");
+    exit(EXIT_ENV);
+}
 
 $results = [];
 $queue = $files;

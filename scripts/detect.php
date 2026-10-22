@@ -10,10 +10,16 @@ declare(strict_types=1);
 ini_set('display_errors', 'stderr');
 require __DIR__ . '/lib.php';
 
+handleHelp($argv, <<<'HELP'
+Project profile: framework and version, hints about the PHP version in use today (composer.json, Dockerfile,
+CI config, .php-version), code size, minified files, and libraries committed into the repo.
+
+Usage: php scripts/detect.php <repo> [--exclude=a,b] > profile.json
+HELP);
+
 $repo = $argv[1] ?? '';
 if ($repo === '' || !is_dir($repo)) {
-    fwrite(STDERR, "Usage: php detect.php <repo>\n");
-    exit(2);
+    usageError($repo === '' ? 'no repo given.' : "repo folder not found: $repo", 'scripts/detect.php');
 }
 $repo = rtrim(realpath($repo), '/');
 $files = listPhpFiles($repo, excludesFrom($argv));

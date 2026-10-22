@@ -19,12 +19,33 @@ ini_set('display_errors', 'stderr');
 require __DIR__ . '/lib.php';
 require __DIR__ . '/history.php';
 
+handleHelp($argv, <<<'HELP'
+Compare two versions of a framework (or any shared code base the app extends) and the impact on an app.
+Read-only.
+
+Usage:
+  php scripts/compare_framework.php --old=<dir> --new=<dir> --app=<dir> [--store=<store> --name="<label>"]
+      [--official=<dir>] [--new-config=<dir>] [--app-config=<dir>] [--adapter=<name>] [--exclude=a,b] [--diff-dir=<dir>]
+
+  --old / --new    The framework folder in use today and the one you move to.
+  --app            The application that extends it.
+  --official       The official release of --old: local patches are reported with diffs.
+  --store          Save as a new version in the history store (otherwise JSON goes to stdout).
+  --adapter        Framework-specific checks from scripts/adapters/<name>/ (default: detected; codeigniter3 is
+                   bundled). Without an adapter only the generic PHP checks run.
+  --new-config / --app-config   Config folders to compare (adapter specific).
+
+Reports removed/changed classes, methods, functions and properties, application overrides that break PHP
+signature rules (fatal when the class loads), calls to removed API, and config keys.
+HELP);
+
 $old = opt($argv, 'old');
 $new = opt($argv, 'new');
 $app = opt($argv, 'app');
-if (!$old || !$new || !$app || !is_dir($old) || !is_dir($new) || !is_dir($app)) {
-    fwrite(STDERR, "Usage: php compare_framework.php --old=<dir> --new=<dir> --app=<dir> [--official=<dir>] [--new-config=<dir>] [--app-config=<dir>] [--diff-dir=<dir>]\n");
-    exit(2);
+foreach (['old' => $old, 'new' => $new, 'app' => $app] as $k => $v) {
+    if (!$v || $v === '1' || !is_dir($v)) {
+        usageError("--$k=<dir> is missing or not a folder.", 'scripts/compare_framework.php');
+    }
 }
 $excludes = excludesFrom($argv);
 $official = opt($argv, 'official');
