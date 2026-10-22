@@ -167,6 +167,20 @@ for lang in en id; do
     node --check "$TMP/check.js" || fail "report script does not parse ($lang)"
   fi
 done
+
+# Open every page of the report in a DOM (catches runtime errors and blank pages that a syntax check misses)
+if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+  [ -d "$DIR/tests/node_modules/jsdom" ] || (cd "$DIR/tests" && npm install --silent --no-audit --no-fund >/dev/null 2>&1) || true
+  if [ -d "$DIR/tests/node_modules/jsdom" ]; then
+    for lang in en id; do
+      node "$DIR/tests/page_check.js" "$TMP/report-$lang.html" || fail "a report page failed to render ($lang)"
+    done
+  else
+    echo "pages: skipped (could not install jsdom; run 'npm install' in tests/)"
+  fi
+else
+  echo "pages: skipped (node/npm not found)"
+fi
 echo "render: ok"
 
 # Redaction end to end: a token in notes (summary, body, code) never reaches the HTML

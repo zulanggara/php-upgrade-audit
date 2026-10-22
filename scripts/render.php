@@ -126,6 +126,13 @@ $redacted = 0;
 $data = redact_data($data, $redacted);
 $data = strip_local_paths($data, [$store => '<store>']);
 $data['redacted'] = $redacted;
+// Final independent check on exactly what goes into the page; refuse to write a report that still has a secret.
+$leftover = secret_scan((string) json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE));
+if ($leftover > 0) {
+    fwrite(STDERR, "Refusing to write the report: $leftover secret-like value(s) are still present after redaction. Find them with the patterns in secret_scan() (scripts/redact.php).\n");
+    exit(4);
+}
+$data['privacy'] = ['redacted' => $redacted, 'leftover' => 0];
 
 $template = (string) file_get_contents(__DIR__ . '/../assets/report-template.html');
 if (opt($argv, 'offline')) {

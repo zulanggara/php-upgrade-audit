@@ -43,6 +43,8 @@ $mustKeep = [
     "PasswordEncoder::encode('') returns a different value",
     "token == \$expected",
     "Password: see the note below",
+    "\"url\": \"https://ghp_••••••@github.com/acme/lib.git\"",
+    "COMPOSER_AUTH='{\"github-oauth\":{\"github.com\":\"ghp_••••••\"}}'",
 ];
 
 $fail = 0;
@@ -62,4 +64,11 @@ foreach ($mustKeep as $s) {
     }
 }
 echo $fail === 0 ? "redaction: ok (" . (count($mustHide) + count($mustKeep)) . " cases)\n" : "redaction: $fail failure(s)\n";
-exit($fail === 0 ? 0 : 1);
+// secret_scan: independent final check
+$bad = ["token $gh here", "key $aws", "https://user:pw@example.com/x", $key];
+$good = ["ghp_••••••", "https://«REDACTED»@github.com/x", "ghp_«REDACTED»", "plain text with no secrets", "-----BEGIN RSA PRIVATE KEY----- «REDACTED» -----END PRIVATE KEY-----"];
+$scanFail = 0;
+foreach ($bad as $s) { if (secret_scan($s) === 0) { $scanFail++; echo "secret_scan MISSED: " . substr($s, 0, 30) . "\n"; } }
+foreach ($good as $s) { if (secret_scan($s) !== 0) { $scanFail++; echo "secret_scan FALSE POSITIVE: $s\n"; } }
+echo $scanFail === 0 ? "secret_scan: ok\n" : "secret_scan: $scanFail failure(s)\n";
+exit($fail === 0 && $scanFail === 0 ? 0 : 1);

@@ -130,9 +130,12 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
    ```
    - One page per repo/comparison, a version selector per page (latest by default; older scans stay
      reachable as `#<repo>~<scan-id>`), and a dashboard.
-   - **Claude with Artifacts**: publish `report.html` with the Artifact tool (icon `code`). Re-render to the same
-     path and publish again to keep the URL. After the first publish, render again with `--url=<link>` so the
-     "Copy link" buttons point at the artifact. The template already follows the artifact page contract.
+   - **Claude with Artifacts**: publish `report.html` with the Artifact tool (icon `code`). Keep **one**
+     artifact per store. To update it, publish the same file path again **or pass the existing artifact `url`**;
+     a different file path without `url` silently creates a second artifact (and the old one stays online with
+     stale content). Before a first publish, check the store's memory/notes or `Artifact list` for an existing
+     report artifact. After the first publish, render again with `--url=<link>` so the "Copy link" buttons point
+     at the artifact, then publish again. The template already follows the artifact page contract.
      The report can describe security problems of the audited code: say so before it is shared.
    - **Anywhere else**: open the file in a browser, or `php -S 127.0.0.1:8085 -t <STORE>` and visit
      `http://127.0.0.1:8085/report.html`. Use `--offline` for a page that makes no external request.

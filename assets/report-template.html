@@ -210,6 +210,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       version: 'Scan version', latest: 'latest', olderView: 'You are viewing an older scan.', toLatest: 'Go to latest',
       vsPrev: 'Compared with previous scan', resolved: 'resolved', added: 'new', unchanged: 'unchanged', firstScan: 'First scan of this repo.',
       carried: (d) => `Analyst notes were carried over from the scan of ${d} and have not been reviewed for this scan yet.`,
+      privTitle: 'Data privacy', privCard: 'Credentials in this report', privLead: (n) => `Credentials are removed when the data is written, before it reaches this page; nothing is merely hidden by the display. When the report was built, an independent check found 0 tokens, private keys or logins-in-URLs in the page data${n ? `, and ${n} value(s) were replaced with «REDACTED» along the way` : ''}. The report does include code excerpts, file names and findings.`,
       dashboard: 'Dashboard', reposAudited: 'Repositories audited', phpFiles: 'PHP files', lines: 'lines', mustItems: 'Must-fix items in repos (analyst notes)',
       depInCode: 'Deprecations in code', behInCode: 'Behaviour changes (review)', lintErr: (t) => `php -l errors on PHP ${t}`, pkgs: 'Composer packages', pkgCheck: 'to check',
       overrideConf: 'Override conflicts (framework merge)', mustList: 'Must fix', distribution: 'Code findings', status: 'Status', repo: 'Repository', framework: 'Framework', packages: 'Packages', lastScan: 'Last scan',
@@ -218,7 +219,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       runtimeTitle: 'Check while the application runs', runtimeLead: (t) => `These depend on runtime values and cannot be confirmed by reading code. Run on PHP ${t} with error_reporting(E_ALL) and watch the logs.`,
       runtime: ['<b>null passed to built-in function parameters</b> (8.1, deprecated): <code>strlen(null)</code>, <code>trim(null)</code>, <code>str_replace(..., null)</code>.', '<b>count() on values that are not arrays or Countable</b> (8.0, TypeError).', '<b>Arithmetic on non-numeric strings</b> (8.0, TypeError): <code>"abc" + 1</code>.', '<b>Reading properties or offsets of null / non-objects</b> (8.0): Warning; writing to a non-object is an Error.', '<b>Dynamic properties on subclasses</b> (8.2, deprecated): the scanner only checks classes without a parent.', '<b>Incrementing non-numeric strings</b>, <b>ord(\'\')</b>, <b>chr() outside 0-255</b> (8.3/8.5, deprecated).', '<b>Float to int casts that do not fit</b> and <b>destructuring non-arrays</b> (8.5, Warning).', '<b>Sort callbacks returning bool</b> (8.0, deprecated): use <code>&lt;=&gt;</code>.'],
       methodTitle: 'How this audit was made',
-      method: ['<b>Code scanner</b>: PHP tokenizer with rules from the official php.net migration guides 7.1 to 8.5. Code guarded by <code>if (PHP_VERSION_ID &lt; ...)</code> or similar is evaluated against the target version.', '<b>Proof from PHP itself</b>: <code>php -l</code> with the target binary on every file, plus loading classes on the target PHP where possible.', '<b>Libraries</b>: the <code>php</code> constraint of every package in <code>composer.lock</code> is matched against the target, plus Packagist metadata. Private packages are never sent to Packagist.', '<b>Cross-checks</b>: PHPCompatibility and Rector <code>--dry-run</code>. The audited repos are never modified.', '<b>Redaction</b>: secrets in snippets, notes and code samples are replaced with «REDACTED» before anything is written.'],
+      methodList: ['<b>Code scanner</b>: PHP tokenizer with rules from the official php.net migration guides 7.1 to 8.5. Code guarded by <code>if (PHP_VERSION_ID &lt; ...)</code> or similar is evaluated against the target version.', '<b>Proof from PHP itself</b>: <code>php -l</code> with the target binary on every file, plus loading classes on the target PHP where possible.', '<b>Libraries</b>: the <code>php</code> constraint of every package in <code>composer.lock</code> is matched against the target, plus Packagist metadata. Private packages are never sent to Packagist.', '<b>Cross-checks</b>: PHPCompatibility and Rector <code>--dry-run</code>. The audited repos are never modified.', '<b>Redaction</b>: secrets in snippets, notes and code samples are replaced with «REDACTED» before anything is written.'],
       analystNotes: 'Analyst notes', profile: 'Profile', fw: 'Framework', phpHints: 'PHP version hints', code: 'Code', minified: 'Minified files', thirdParty: 'Non-Composer libraries', git: 'Git', none: 'none', notDetected: 'not detected', notGit: 'not a git repo', fromSrc: 'from', minifiedTxt: (n) => `${n} files; locations are shown as code excerpts.`,
       mustScanner: 'Must fix (scanner)', deadOn: (t) => `not run on ${t}`, lintStat: 'php -l errors', pkgStat: 'Composer packages',
       libTitle: 'Composer libraries', noComposer: 'This repo does not use Composer.', noComposerBundled: 'No Composer at the root; the packages below come from vendor/ folders committed into the repo.', bundledIn: (p) => `bundled in ${p}`, wpHeader: (t, n, v, r) => `WordPress ${t} “${n}” ${v || ''}${r ? ', Requires PHP ' + r : ''}`, notSet: 'not set', notAllow: (t) => `does not allow ${t}`, mustChange: (t) => `must be changed to ${t}`, noLock: 'no composer.lock',
@@ -245,7 +246,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       config: 'Config', cfgFile: 'File', cfgNew: 'New keys in the new version (not in the app)', cfgUnused: 'App keys no longer read',
       sigChanged: (n) => `Changed method signatures (${n})`, methodCol: 'Method', oldNew: 'Old → new', moreReq: 'more required args', retAdded: 'new return type',
       removedTitle: 'Removed methods, classes and functions', classes: 'Classes', methods: 'Methods', functions: 'Functions', funcChanged: 'Changed functions', filesAddRem: 'Files added / removed', addedL: 'Added', removedL: 'Removed',
-      footer: (n) => `Read-only report: no file in the audited repos was changed. ${n} sensitive value(s) were redacted.`, footerData: 'Raw data per scan lives in the history store: <entity>/scans/<scan-id>/.'
+      footer: (n) => `Read-only report: no file in the audited repos was changed. ${n ? n + ' sensitive value(s) were redacted.' : 'No sensitive values were found to redact.'}`, footerData: 'Every scan is kept in the local history store (one folder per scan), so earlier versions stay available in the version selector.'
     },
     id: {
       menu: 'Buka menu', menuLabel: 'Menu laporan', grpReport: 'Laporan', grpRepos: 'Repo', grpCompare: 'Perbandingan', overview: 'Ringkasan',
@@ -256,6 +257,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       version: 'Versi scan', latest: 'terbaru', olderView: 'Anda sedang melihat scan lama.', toLatest: 'Ke versi terbaru',
       vsPrev: 'Dibanding scan sebelumnya', resolved: 'teratasi', added: 'baru', unchanged: 'tetap', firstScan: 'Scan pertama untuk repo ini.',
       carried: (d) => `Catatan analis dibawa dari scan ${d} dan belum ditinjau ulang untuk scan ini.`,
+      privTitle: 'Privasi data', privCard: 'Kredensial di laporan ini', privLead: (n) => `Kredensial dibuang saat data ditulis, sebelum sampai ke halaman ini; tidak ada yang sekadar disembunyikan oleh tampilan. Saat laporan dibuat, pemeriksaan independen tidak menemukan token, kunci privat, atau login di dalam URL pada data halaman${n ? `, dan ${n} nilai diganti «REDACTED» sepanjang prosesnya` : ''}. Laporan memang memuat potongan kode, nama file, dan temuan.`,
       dashboard: 'Dashboard', reposAudited: 'Repo diaudit', phpFiles: 'File PHP', lines: 'baris', mustItems: 'Hal wajib di repo (catatan analis)',
       depInCode: 'Deprecation di kode', behInCode: 'Perubahan perilaku (perlu review)', lintErr: (t) => `Error php -l di PHP ${t}`, pkgs: 'Package Composer', pkgCheck: 'perlu dicek',
       overrideConf: 'Konflik override (merge framework)', mustList: 'Yang wajib ditangani', distribution: 'Temuan kode', status: 'Status', repo: 'Repo', framework: 'Framework', packages: 'Package', lastScan: 'Scan terakhir',
@@ -264,7 +266,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       runtimeTitle: 'Perlu dicek saat aplikasi berjalan', runtimeLead: (t) => `Perubahan berikut bergantung pada isi variabel saat runtime, jadi tidak bisa dipastikan dari membaca kode. Jalankan di PHP ${t} dengan error_reporting(E_ALL), lalu periksa log.`,
       runtime: ['<b>null ke parameter fungsi bawaan</b> (8.1, deprecated): <code>strlen(null)</code>, <code>trim(null)</code>, <code>str_replace(..., null)</code>.', '<b>count() pada nilai yang bukan array atau Countable</b> (8.0, TypeError).', '<b>Aritmetika pada string bukan angka</b> (8.0, TypeError): <code>"abc" + 1</code>.', '<b>Akses properti atau offset dari null/non-object</b> (8.0): Warning; menulis ke non-object menjadi Error.', '<b>Dynamic property pada class turunan</b> (8.2, deprecated): scanner hanya memeriksa class tanpa parent.', '<b>Increment string non-angka</b>, <b>ord(\'\')</b>, <b>chr() di luar 0-255</b> (8.3/8.5, deprecated).', '<b>Cast float ke int yang tidak muat</b> dan <b>destructuring nilai bukan array</b> (8.5, Warning).', '<b>Callback sort yang mengembalikan bool</b> (8.0, deprecated): ganti dengan <code>&lt;=&gt;</code>.'],
       methodTitle: 'Cara audit ini dibuat',
-      method: ['<b>Scanner kode</b>: tokenizer PHP dengan aturan dari panduan migrasi resmi php.net 7.1 sampai 8.5. Kode yang dijaga <code>if (PHP_VERSION_ID &lt; ...)</code> atau sejenisnya dievaluasi terhadap versi target.', '<b>Bukti dari PHP</b>: <code>php -l</code> dengan binary target ke semua file, plus memuat class di PHP target bila memungkinkan.', '<b>Library</b>: constraint <code>php</code> setiap package di <code>composer.lock</code> dicocokkan dengan versi target, plus metadata Packagist. Package privat tidak pernah dikirim ke Packagist.', '<b>Pembanding</b>: PHPCompatibility dan Rector <code>--dry-run</code>. Repo yang diaudit tidak pernah diubah.', '<b>Penyensoran</b>: rahasia di potongan kode, catatan, dan contoh kode diganti «REDACTED» sebelum apa pun ditulis.'],
+      methodList: ['<b>Scanner kode</b>: tokenizer PHP dengan aturan dari panduan migrasi resmi php.net 7.1 sampai 8.5. Kode yang dijaga <code>if (PHP_VERSION_ID &lt; ...)</code> atau sejenisnya dievaluasi terhadap versi target.', '<b>Bukti dari PHP</b>: <code>php -l</code> dengan binary target ke semua file, plus memuat class di PHP target bila memungkinkan.', '<b>Library</b>: constraint <code>php</code> setiap package di <code>composer.lock</code> dicocokkan dengan versi target, plus metadata Packagist. Package privat tidak pernah dikirim ke Packagist.', '<b>Pembanding</b>: PHPCompatibility dan Rector <code>--dry-run</code>. Repo yang diaudit tidak pernah diubah.', '<b>Penyensoran</b>: rahasia di potongan kode, catatan, dan contoh kode diganti «REDACTED» sebelum apa pun ditulis.'],
       analystNotes: 'Catatan analis', profile: 'Profil', fw: 'Framework', phpHints: 'Petunjuk versi PHP', code: 'Kode', minified: 'File minified', thirdParty: 'Library non-Composer', git: 'Git', none: 'tidak ada', notDetected: 'tidak terdeteksi', notGit: 'bukan repo git', fromSrc: 'dari', minifiedTxt: (n) => `${n} file; lokasi temuan ditampilkan sebagai potongan kode.`,
       mustScanner: 'Wajib diubah (scanner)', deadOn: (t) => `mati di ${t}`, lintStat: 'Error dari php -l', pkgStat: 'Package Composer',
       libTitle: 'Library Composer', noComposer: 'Repo ini tidak memakai Composer.', noComposerBundled: 'Tidak ada Composer di root; package di bawah berasal dari folder vendor/ yang ter-commit di repo.', bundledIn: (p) => `terbundel di ${p}`, wpHeader: (t, n, v, r) => `WordPress ${t} “${n}” ${v || ''}${r ? ', Requires PHP ' + r : ''}`, notSet: 'tidak diisi', notAllow: (t) => `tidak mengizinkan ${t}`, mustChange: (t) => `harus diubah ke ${t}`, noLock: 'tidak ada composer.lock',
@@ -291,7 +293,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       config: 'Config', cfgFile: 'File', cfgNew: 'Key baru di versi baru (belum ada di aplikasi)', cfgUnused: 'Key aplikasi yang tidak dibaca lagi',
       sigChanged: (n) => `Signature method yang berubah (${n})`, methodCol: 'Method', oldNew: 'Lama → baru', moreReq: 'argumen wajib bertambah', retAdded: 'return type baru',
       removedTitle: 'Method, class, dan fungsi yang dihapus', classes: 'Class', methods: 'Method', functions: 'Fungsi', funcChanged: 'Fungsi berubah', filesAddRem: 'File ditambah/dihapus', addedL: 'Baru', removedL: 'Dihapus',
-      footer: (n) => `Laporan read-only: tidak ada file di repo yang diaudit yang diubah. ${n} nilai sensitif disensor.`, footerData: 'Data mentah per scan ada di history store: <entitas>/scans/<scan-id>/.'
+      footer: (n) => `Laporan read-only: tidak ada file di repo yang diaudit yang diubah. ${n ? n + ' nilai sensitif disensor.' : 'Tidak ada nilai sensitif yang perlu disensor.'}`, footerData: 'Setiap scan disimpan di history store lokal (satu folder per scan), jadi versi sebelumnya tetap bisa dibuka lewat pemilih versi.'
     }
   };
   const T = I18N[LANG];
@@ -411,7 +413,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
     }
     Object.entries(rendered).forEach(([k, el]) => { el.hidden = k !== key; });
     document.querySelectorAll('#nav a').forEach((a) => { if (a.dataset.page === page.id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
-    const active = document.querySelector(`#nav a[data-page="${CSS.escape(page.id)}"]`);
+    const active = [...document.querySelectorAll('#nav a')].find((a) => a.dataset.page === page.id);
     if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' });
   }
   window.addEventListener('hashchange', () => { show(); window.scrollTo(0, 0); });
@@ -482,7 +484,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       </section>
       ${(overview.notes || []).length ? `<section><h2>${esc(T.crossNotes)}</h2>${notesHtml(overview.notes)}</section>` : ''}
       <section><h2>${esc(T.runtimeTitle)}</h2><p class="lead">${esc(T.runtimeLead(target))}</p><ul class="checklist">${T.runtime.map((x) => `<li>${x}</li>`).join('')}</ul></section>
-      <section><h2>${esc(T.methodTitle)}</h2><ul class="checklist">${T.method.map((x) => `<li>${x}</li>`).join('')}</ul></section>`;
+      <section><h2>${esc(T.methodTitle)}</h2><ul class="checklist">${T.methodList.map((x) => `<li>${x}</li>`).join('')}</ul></section>`;
   }
 
   function dashboardHtml() {
@@ -508,7 +510,9 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
         <div class="stat ${noLint ? 'ok' : 'wajib'}"><span class="v">${sum((x) => x.a.lintErr)}</span><span class="k">${esc(T.lintErr(target))}</span></div>
         <div class="stat"><span class="v">${pkgs}</span><span class="k">${esc(T.pkgs)} · ${toCheck} ${esc(T.pkgCheck)}</span></div>
         ${compares.length ? `<div class="stat"><span class="v">${conflicts}</span><span class="k">${esc(T.overrideConf)}</span></div>` : ''}
+        <div class="stat ok"><span class="v">${(DATA.privacy || {}).leftover || 0}</span><span class="k">${esc(T.privCard)}</span></div>
       </div>
+      <p class="lead priv"><b>${esc(T.privTitle)}.</b> ${esc(T.privLead((DATA.privacy || {}).redacted || 0))}</p>
       <div class="table-scroll"><table class="dash"><thead><tr><th>${esc(T.repo)}</th><th>${esc(T.status)}</th><th>${esc(T.distribution)}</th><th class="num">${esc(T.packages)}</th></tr></thead><tbody>
         ${all.map(({ e, v, a }) => { const n = a.counts.wajib + a.counts.deprecated + a.counts.perilaku;
           return `<tr><td><a href="#${esc(slug(e.name))}">${esc(e.name)}</a></td><td><span class="pill ${a.status[0]}">${esc(a.status[1])}</span></td>

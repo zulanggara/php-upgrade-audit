@@ -1,0 +1,6 @@
+{
+  "name": "php-upgrade-audit-tests",
+  "private": true,
+  "description": "Browser-level check of the rendered report (opens every page in jsdom).",
+  "devDependencies": { "jsdom": "^26.0.0" }
+}

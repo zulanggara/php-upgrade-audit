@@ -24,7 +24,7 @@ function redact_text(string $s, int &$count = 0): string
         // Private key blocks (complete or cut off in a snippet)
         '/-----BEGIN ([A-Z ]*)PRIVATE KEY-----.*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/s' => '-----BEGIN $1PRIVATE KEY----- ' . REDACTED . ' -----END PRIVATE KEY-----',
         // Well-known token formats (prefix kept so the reader knows what it was)
-        '/\b(gh[pousr])_[A-Za-z0-9]{20,}/' => '$1_' . REDACTED,
+        '/\b(gh[pousr])_(?!•)[A-Za-z0-9]{20,}/' => '$1_' . REDACTED,
         '/\bgithub_pat_[A-Za-z0-9_]{20,}/' => 'github_pat_' . REDACTED,
         '/\bglpat-[A-Za-z0-9_-]{16,}/' => 'glpat-' . REDACTED,
         '/\bxox[abprs]-[A-Za-z0-9-]{10,}/' => 'xox-' . REDACTED,
@@ -34,7 +34,8 @@ function redact_text(string $s, int &$count = 0): string
         '/\bSG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}/' => 'SG.' . REDACTED,
         '/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/' => 'eyJ' . REDACTED,
         // Credentials inside URLs: scheme://user:pass@host or scheme://token@host
-        '#\b([a-z][a-z0-9+.-]*://)[^/\s:@\'"<>]+(?::[^@\s/\'"<>]*)?@#i' => '$1' . REDACTED . '@',
+        // (skipped when the value is already a placeholder such as ghp_•••••• or «REDACTED»)
+        '#\b([a-z][a-z0-9+.-]*://)(?![^/\s@]*(?:•|«))[^/\s:@\'"<>]+(?::[^@\s/\'"<>]*)?@#i' => '$1' . REDACTED . '@',
         // Authorization headers
         '/(Authorization\s*["\']?\s*[:=]\s*["\']?\s*(?:Bearer|Basic|Token)\s+)[A-Za-z0-9._~+\/=-]{8,}/i' => '$1' . REDACTED,
         // 'password' => 'value'   /   "token": "value"
@@ -73,4 +74,30 @@ function redact_data(mixed $data, int &$count = 0): mixed
         }
     }
     return $data;
+}
+
+/**
+ * Independent final check: count high-confidence secret formats left in a string (known token formats, private
+ * key blocks, credentials inside URLs). Unlike redact_text() it has no key-name heuristics, so it does not
+ * depend on the same rules that did the redaction. A correct pipeline always returns 0 here.
+ */
+function secret_scan(string $s): int
+{
+    $patterns = [
+        '/\bgh[pousr]_(?!\x{2022})[A-Za-z0-9]{20,}/u',
+        '/\bgithub_pat_[A-Za-z0-9_]{20,}/',
+        '/\bglpat-[A-Za-z0-9_-]{16,}/',
+        '/\bxox[abprs]-[A-Za-z0-9-]{10,}/',
+        '/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/',
+        '/\bAIza[0-9A-Za-z_-]{35}\b/',
+        '/\b[sprk]k_(?:live|test)_[0-9A-Za-z]{10,}/',
+        '/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/',
+        '/-----BEGIN [A-Z ]*PRIVATE KEY-----(?!\s*\x{AB}REDACTED)/u',
+        '#\b[a-z][a-z0-9+.-]*://(?![^/\s@]*[\x{2022}\x{AB}])[^/\s:@\'"<>]+(?::[^@\s/\'"<>]*)?@#iu',
+    ];
+    $n = 0;
+    foreach ($patterns as $re) {
+        $n += (int) preg_match_all($re, $s);
+    }
+    return $n;
 }
