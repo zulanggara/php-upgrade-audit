@@ -24,8 +24,8 @@
  *   special      check                    custom check implemented in scan_code.php
  * Optional argument filters for func/method: argc => ['<', 5], arg_token => [...],
  *   arg_string => ['index' => 0|'any', 'values' => [...]], arg_is_string => index
- * Optional for method: only_if_mentioned => 'ClassName' (the rule only applies in files that mention the class,
- *   for generic names such as ->contains()).
+ * Optional for func/method: only_if_mentioned => 'Name' or ['a', 'b'] (the rule only applies in files that mention
+ *   one of them, for generic names such as ->contains() or is_resource()).
  * Optional: rector => name of the Rector rule that fixes it (shown in the report).
  */
 
@@ -82,7 +82,7 @@ return [
             'INTL_IDNA_VARIANT_2003', 'MB_OVERLOAD_MAIL', 'MB_OVERLOAD_STRING', 'MB_OVERLOAD_REGEX', 'ASSERT_QUIET_EVAL', 'AI_IDN_ALLOW_UNASSIGNED', 'AI_IDN_USE_STD3_ASCII_RULES'],
         'title' => 'Konstanta sudah dihapus di PHP 8.0 (Undefined constant)',
         'fix' => 'FILTER_SANITIZE_MAGIC_QUOTES -> FILTER_SANITIZE_ADD_SLASHES; FILTER_FLAG_*_REQUIRED -> hapus (FILTER_VALIDATE_URL selalu mewajibkan scheme & host).', 'ref' => MIG . 'migration80.incompatible.php'],
-    ['id' => 'P80-REMOVED-INI', 'sev' => 'perilaku', 'ver' => '7.1–8.1', 'conf' => 'tinggi', 'kind' => 'ini',
+    ['id' => 'P80-REMOVED-INI', 'sev' => 'perilaku', 'ver' => '7.1–8.1', 'conf' => 'tinggi', 'kind' => 'ini', 'funcs' => ['ini_set', 'ini_alter'],
         'names' => ['track_errors', 'mbstring.func_overload', 'assert.quiet_eval', 'pdo_odbc.db2_instance_name', 'log_errors_max_len', 'session.hash_function',
             'session.hash_bits_per_character', 'session.entropy_file', 'session.entropy_length', 'safe_mode', 'sql.safe_mode', 'mysqlnd.fetch_data_copy', 'opcache.consistency_checks'],
         'title' => 'Direktif INI sudah dihapus (ini_set/ini_get mengembalikan false, tanpa error)',
@@ -114,6 +114,10 @@ return [
     ['id' => 'P80-SUBSTR-FALSE', 'sev' => 'perilaku', 'ver' => '8.0', 'conf' => 'sedang', 'kind' => 'special', 'check' => 'substr_false',
         'title' => 'substr()/mb_substr() di luar batas sekarang mengembalikan "" bukan false', 'fix' => 'Cek === false tidak akan pernah true lagi. Ganti ke === "" atau cek panjang string.', 'ref' => MIG . 'migration80.incompatible.php'],
     ['id' => 'P80-IS-RESOURCE', 'sev' => 'perilaku', 'ver' => '8.0', 'conf' => 'sedang', 'kind' => 'func', 'names' => ['is_resource', 'get_resource_type'],
+        // Only files that create one of the resources that became objects; file handles and DB results did not.
+        'only_if_mentioned' => ['curl_', 'imagecreate', 'xml_parser_create', 'socket_create', 'socket_accept', 'openssl_', 'ftp_connect', 'ftp_ssl_connect',
+            'finfo_open', 'ldap_connect', 'pg_connect', 'pg_pconnect', 'imap_open', 'dba_open', 'dba_popen', 'odbc_connect', 'odbc_pconnect', 'sem_get',
+            'shm_attach', 'msg_get_queue', 'shmop_open', 'deflate_init', 'inflate_init', 'xmlwriter_open', 'enchant_broker', 'pspell_new', 'imagecreatefrom'],
         'title' => 'Banyak resource sekarang jadi object (curl, gd, xml, socket, openssl; 8.1: ftp, finfo, ldap, pgsql, imap; 8.4: dba, odbc)',
         'fix' => 'is_resource($ch) jadi false untuk CurlHandle, GdImage, dll. Ganti ke cek !== false.', 'ref' => MIG . 'migration80.incompatible.php'],
     ['id' => 'P80-PDO-ERRMODE', 'sev' => 'perilaku', 'ver' => '8.0', 'conf' => 'sedang', 'kind' => 'new', 'classes' => ['PDO'],

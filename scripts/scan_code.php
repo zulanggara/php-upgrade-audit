@@ -635,6 +635,9 @@ final class Scanner
         $line = $this->sig[$i][2];
         [$args, $close, $spread] = $this->parseArgs($i + 1);
         foreach ($this->byKind['func'] ?? [] as $r) {
+            if (!$this->mentioned($r)) {
+                continue;
+            }
             if (in_array($name, $r['names'], true) && $this->argMatches($r, $args, $spread)) {
                 $this->add($r['id'], $line);
             }
@@ -686,13 +689,24 @@ final class Scanner
         [$args, , $spread] = $this->parseArgs($i + 1);
         foreach ($this->byKind['method'] ?? [] as $r) {
             // A generic name (->contains()) only counts in files that use the class at all.
-            if (isset($r['only_if_mentioned']) && !str_contains($this->codeLower, strtolower($r['only_if_mentioned']))) {
+            if (!$this->mentioned($r)) {
                 continue;
             }
             if (in_array($name, array_map('strtolower', $r['names']), true) && $this->argMatches($r, $args, $spread)) {
                 $this->add($r['id'], $this->sig[$i][2]);
             }
         }
+    }
+
+    /** only_if_mentioned: the file must contain one of these names (case-insensitive) for the rule to apply. */
+    private function mentioned(array $r): bool
+    {
+        foreach ((array) ($r['only_if_mentioned'] ?? []) as $needle) {
+            if (str_contains($this->codeLower, strtolower($needle))) {
+                return true;
+            }
+        }
+        return !isset($r['only_if_mentioned']);
     }
 
     private function checkConst(int $i): void
@@ -789,6 +803,74 @@ final class Scanner
     {
         foreach ($this->enumRanges as [$a, $b]) {
             if ($i > $a && $i < $b) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Built-in functions that return a number (int|false at most), so "f() == 0" compares numbers on every version. */
+    private const NUMERIC_FUNCS = ['count', 'sizeof', 'strlen', 'mb_strlen', 'iconv_strlen', 'strcmp', 'strcasecmp', 'strncmp', 'strncasecmp',
+        'strnatcmp', 'strnatcasecmp', 'substr_count', 'mb_substr_count', 'intval', 'floatval', 'ord', 'preg_match', 'preg_match_all',
+        'array_sum', 'array_product', 'abs', 'round', 'floor', 'ceil', 'intdiv', 'fmod', 'filesize', 'time', 'mktime', 'crc32',
+        'strspn', 'strcspn', 'levenshtein', 'similar_text', 'memory_get_usage', 'error_reporting', 'func_num_args', 'rand', 'mt_rand',
+        'random_int', 'bccomp', 'version_compare', 'connection_status', 'ip2long'];
+
+    /**
+     * Whether the operand next to a comparison is clearly a number: a call to a numeric built-in, a cast, or an
+     * arithmetic/bitwise expression. $dir: 1 = operand starts at $k, -1 = operand ends at $k.
+     */
+    private function isNumericOperand(int $k, int $dir): bool
+    {
+        $casts = [T_INT_CAST, T_DOUBLE_CAST];
+        $isNumFunc = fn (string $f) => in_array(strtolower(ltrim($f, '\\')), self::NUMERIC_FUNCS, true) || str_starts_with(strtolower($f), 'gmp_');
+        $id = $this->id($k);
+        if ($dir > 0) {
+            if (in_array($id, $casts, true)) {
+                return true;
+            }
+            if (in_array($id, [T_STRING, T_NAME_FULLY_QUALIFIED], true) && $this->id($k + 1) === '(') {
+                return $isNumFunc($this->text($k));
+            }
+            if ($id === '(') {
+                for ($depth = 0, $j = $k; $j < count($this->sig); $j++) {
+                    if (self::isOpen($this->id($j))) {
+                        $depth++;
+                    } elseif (self::isClose($this->id($j)) && --$depth === 0) {
+                        return $this->numericInside($k + 1, $j - 1);
+                    }
+                }
+            }
+            return false;
+        }
+        if ($id === ')') {
+            $open = $this->matchBack($k);
+            if ($open === null) {
+                return false;
+            }
+            $before = $this->id($open - 1);
+            if (in_array($before, [T_STRING, T_NAME_FULLY_QUALIFIED], true)) {
+                return $isNumFunc($this->text($open - 1));
+            }
+            return in_array($before, $casts, true) || $this->numericInside($open + 1, $k - 1);
+        }
+        return $id === T_VARIABLE && in_array($this->id($k - 1), $casts, true);
+    }
+
+    /** An arithmetic or bitwise operator at the top level of the tokens $a..$b. */
+    private function numericInside(int $a, int $b): bool
+    {
+        if (in_array($this->id($a), [T_INT_CAST, T_DOUBLE_CAST], true)) {
+            return true;
+        }
+        $ops = ['&', '|', '^', '%', '*', '/', '+', '-', T_SL, T_SR, T_POW, T_AMPERSAND_FOLLOWED_BY_VAR_OR_VARARG, T_AMPERSAND_NOT_FOLLOWED_BY_VAR_OR_VARARG];
+        for ($depth = 0, $j = $a; $j <= $b; $j++) {
+            $id = $this->id($j);
+            if (self::isOpen($id)) {
+                $depth++;
+            } elseif (self::isClose($id)) {
+                $depth--;
+            } elseif ($depth === 0 && in_array($id, $ops, true)) {
                 return true;
             }
         }
@@ -1090,7 +1172,8 @@ final class Scanner
             if ($id === T_IS_EQUAL || $id === T_IS_NOT_EQUAL) {
                 $l = $i - 1;
                 $r = $i + 1;
-                if (($this->isZeroOrEmpty($l) && !$this->isLiteral($r)) || ($this->isZeroOrEmpty($r) && !$this->isLiteral($l))) {
+                if (($this->isZeroOrEmpty($l) && !$this->isLiteral($r) && !$this->isNumericOperand($r, 1))
+                    || ($this->isZeroOrEmpty($r) && !$this->isLiteral($l) && !$this->isNumericOperand($l, -1))) {
                     $this->special('loose_cmp', $this->sig[$i][2]);
                 }
             }

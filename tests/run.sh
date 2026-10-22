@@ -55,6 +55,37 @@ php "$DIR/scripts/scan_code.php" "$TMP/guard" --target="$RUNTIME" | grep -q '"gu
 php "$DIR/scripts/scan_code.php" "$TMP/guard" --target="$OTHER" | grep -q '"guard_state": "?"' || fail "function_exists() guard evaluated with a PHP that is not the target"
 echo "scanner guards: ok"
 
+# Loose comparison with 0: only when the other side can be a non-numeric string (measured false positives)
+mkdir -p "$TMP/cmp"
+cat > "$TMP/cmp/a.php" <<'PHP'
+<?php
+if (strcasecmp($a, 'inline') == 0) {}
+if (0 == count($list)) {}
+if (($flags & $flag) != 0) {}
+if (gmp_prob_prime($v, 10) != 0) {}
+if ((int) $step == 0) {}
+if (strlen($s) == 0) {}
+if ($status == 0) {}
+PHP
+php "$DIR/scripts/scan_code.php" "$TMP/cmp" > "$TMP/cmp.json"
+[ "$(grep -c '"rule": "P80-LOOSE-CMP"' "$TMP/cmp.json")" = "1" ] || fail "loose comparison: expected only \$status == 0, got: $(grep -A3 'P80-LOOSE-CMP' "$TMP/cmp.json" | grep '"line"' | tr -d ' \n')"
+grep -q '"line": 8' "$TMP/cmp.json" || fail "loose comparison: \$status == 0 not reported"
+
+# is_resource(): only where a resource type that became an object in PHP 8 is used in the file
+mkdir -p "$TMP/res"
+printf '<?php\n$fp = fopen("x", "r");\nif (is_resource($fp)) { fclose($fp); }\n' > "$TMP/res/file.php"
+printf '<?php\n$ch = curl_init();\nif (is_resource($ch)) { curl_exec($ch); }\n' > "$TMP/res/curl.php"
+php "$DIR/scripts/scan_code.php" "$TMP/res" > "$TMP/res.json"
+grep -q '"file": "file.php"' "$TMP/res.json" && fail "is_resource() on a file handle reported"
+grep -q '"file": "curl.php"' "$TMP/res.json" || fail "is_resource() on a curl handle not reported"
+
+# Removed INI settings: reading one (polyfills do) is harmless, setting one has no effect any more
+printf '<?php\n$o = ini_get("mbstring.func_overload");\nini_set("track_errors", "1");\n' > "$TMP/res/ini.php"
+php "$DIR/scripts/scan_code.php" "$TMP/res" > "$TMP/ini.json"
+php -r '$f = array_filter(json_decode(file_get_contents($argv[1]), true)["findings"], fn ($x) => $x["rule"] === "P80-REMOVED-INI");
+exit(array_column($f, "line") === [3] ? 0 : 1);' "$TMP/ini.json" || fail "removed INI: only ini_set() must be reported"
+echo "scanner heuristics: ok"
+
 # Lint must report the curly-offset parse error
 php "$DIR/scripts/lint.php" "$DIR/fixtures/legacy-app" > "$TMP/lint.json"
 grep -q '"Parse error"' "$TMP/lint.json" || fail "lint did not report the parse error"
