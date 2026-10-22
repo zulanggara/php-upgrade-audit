@@ -1,7 +1,7 @@
 <?php
 // Load the class definitions of one CodeIgniter 3 application file on top of a given system/ folder (no request, no DB)
 // and print every PHP message as JSON. Signature conflicts show up here as fatal errors.
-// Usage: php -d error_reporting=-1 -d display_errors=0 ci3_link_app.php <system-dir> <app-dir> <file.php>
+// Usage: php -d error_reporting=-1 -d display_errors=0 link_app.php <system-dir> <app-dir> <file.php>
 [$_, $system, $app, $file] = $argv;
 define('BASEPATH', rtrim($system, '/') . '/');
 define('APPPATH', rtrim($app, '/') . '/');

@@ -54,7 +54,7 @@ The same workflow is described for other AI coding agents in `AGENTS.md`; keep b
    - Cross-check `phpcompat.json`; anything only PHPCompatibility found still has to be checked.
    - Prove doubtful behaviour by running a small snippet on the target PHP.
    - Runtime proof without booting the app: `scripts/load_vendor.php` loads every class of vendor packages
-     (install them in a scratch copy first); for CodeIgniter 3, `scripts/ci3_link_app.php` loads each app file on a
+     (install them in a scratch copy first); for CodeIgniter 3, `scripts/adapters/codeigniter3/link_app.php` loads each app file on a
      given `system/` folder (see `references/ci3.md`).
 
 4. **Framework switch or merge** (e.g. an old CodeIgniter `system/` to a maintained fork):
@@ -121,7 +121,7 @@ The same workflow is described for other AI coding agents in `AGENTS.md`; keep b
 | `scripts/check_libs.php` | Composer libraries vs target, abandoned packages, Packagist suggestions, removed extensions |
 | `scripts/run_tools.php` | PHPCompatibility + Rector dry-run |
 | `scripts/compare_framework.php` | Framework old vs new vs application |
-| `scripts/load_vendor.php`, `scripts/ci3_link_app.php` | Runtime proof by loading classes |
+| `scripts/load_vendor.php`, `scripts/adapters/codeigniter3/link_app.php` | Runtime proof by loading classes |
 | `scripts/history.php` | History store helpers; `list` / `migrate` CLI |
 | `scripts/redact.php` | Secret redaction used by every writer and the renderer |
 | `scripts/render.php` | Store → one HTML report (`assets/report-template.html`) |

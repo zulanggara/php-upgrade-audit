@@ -129,7 +129,7 @@ Scan ids are UTC timestamps (`20261022T131200Z`), so folders sort chronologicall
   to watch for while running on the target PHP with `E_ALL`.
 - The rule catalogue covers PHP 7.1 → 8.5 as published on php.net. Update it when a new PHP version is
   released (`references/rules.md`).
-- Class-loading proof (`ci3_link_app.php`) is CodeIgniter 3 specific; other frameworks need their own loader.
+- Class-loading proof (`scripts/adapters/codeigniter3/link_app.php`) is CodeIgniter 3 specific; other frameworks need their own loader.
 - PHPCompatibility 10 is still alpha; the scanner and `php -l` do not depend on it.
 
 ## Repository layout

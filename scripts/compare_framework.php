@@ -48,6 +48,7 @@ foreach (['old' => $old, 'new' => $new, 'app' => $app] as $k => $v) {
     }
 }
 $excludes = excludesFrom($argv);
+$adapter = loadAdapter(opt($argv, 'adapter'), [$old, $new]);
 $official = opt($argv, 'official');
 $diffDir = opt($argv, 'diff-dir');
 // --store=<OUT>: save as a new version in the history store instead of printing to stdout
@@ -75,6 +76,9 @@ $result = [
     'new' => ['path' => basename(dirname(realpath($new))) . '/' . basename(realpath($new)), 'files' => count($newApi['files']), 'classes' => count($newApi['classes']), 'functions' => count($newApi['functions'])],
     'app' => ['path' => basename(realpath($app)), 'files' => count($appApi['files']), 'classes' => count($appApi['classes'])],
 ];
+if ($adapter !== null) {
+    $result['adapter'] = $adapter['name'];
+}
 
 // 1. Patch lokal: framework lama vs rilis resmi
 if ($official && is_dir($official)) {
@@ -101,19 +105,19 @@ $result['api'] = diffApi($oldApi, $newApi);
 
 // 3. Kompatibilitas override aplikasi
 $result['overrides'] = [
-    'new' => checkOverrides($appApi, $newApi),
-    'old' => checkOverrides($appApi, $oldApi),
+    'new' => checkOverrides($appApi, $newApi, $adapter, $oldApi),
+    'old' => checkOverrides($appApi, $oldApi, $adapter, $oldApi),
 ];
 $result['app_parents'] = appParents($appApi, $newApi, $oldApi);
 
 // 4. Calls to removed/changed API
-$result['usage'] = findUsage(realpath($app), $excludes, $result['api'], $files['removed']);
+$result['usage'] = findUsage(realpath($app), $excludes, $result['api'], $files['removed'], $adapter);
 
 // 5. Config
 $newCfg = opt($argv, 'new-config');
 $appCfg = opt($argv, 'app-config');
 if ($newCfg && $appCfg && is_dir($newCfg) && is_dir($appCfg)) {
-    $result['config'] = diffConfig(realpath($newCfg), realpath($appCfg), stringLiterals(realpath($old), $excludes), stringLiterals(realpath($new), $excludes));
+    $result['config'] = diffConfig(realpath($newCfg), realpath($appCfg), stringLiterals(realpath($old), $excludes), stringLiterals(realpath($new), $excludes), $adapter);
 }
 
 if ($storeDir !== null) {
@@ -128,6 +132,36 @@ if ($storeDir !== null) {
 }
 
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * Framework adapter from scripts/adapters/<name>/adapter.php. "auto" (default) picks the first adapter whose
+ * detect() matches --old or --new; "none" runs the generic checks only.
+ */
+function loadAdapter(?string $name, array $dirs): ?array
+{
+    $root = __DIR__ . '/adapters';
+    if ($name === 'none') {
+        return null;
+    }
+    if ($name !== null && $name !== 'auto') {
+        $file = "$root/" . basename($name) . '/adapter.php';
+        if (!is_file($file)) {
+            $have = array_map('basename', glob("$root/*", GLOB_ONLYDIR) ?: []);
+            usageError("unknown --adapter=$name (available: " . implode(', ', [...$have, 'none']) . ').', 'scripts/compare_framework.php');
+        }
+        return require $file;
+    }
+    foreach (glob("$root/*/adapter.php") ?: [] as $file) {
+        $a = require $file;
+        foreach ($dirs as $d) {
+            if (($a['detect'])((string) realpath($d))) {
+                fwrite(STDERR, "Adapter: {$a['label']} (detected; --adapter=none for generic checks only)\n");
+                return $a;
+            }
+        }
+    }
+    return null;
+}
 
 function sigTokens(string $code): array
 {
@@ -551,13 +585,19 @@ function normType(?string $t): string
 }
 
 /** Aturan kompatibilitas signature PHP (disederhanakan). Kembalikan daftar masalah. */
-function checkOverrides(array $app, array $fw): array
+function checkOverrides(array $app, array $fw, ?array $adapter, array $oldFw): array
 {
     $issues = [];
     foreach ($app['classes'] as $c) {
         $parent = frameworkParent($app, $fw, $c['extends']);
         if ($parent === null) {
-            if ($c['extends'] !== null && !isset($app['classes'][strtolower($c['extends'])]) && str_starts_with($c['extends'], 'CI_')) {
+            // A missing parent is fatal when it carries the framework prefix (adapter), or, generically, when
+            // the old framework had it and this one does not.
+            $ext = $c['extends'];
+            $missing = $ext !== null && !isset($app['classes'][strtolower($ext)]) && ($adapter !== null
+                ? str_starts_with($ext, $adapter['class_prefix'])
+                : isset($oldFw['classes'][strtolower($ext)]) && !isset($fw['classes'][strtolower($ext)]));
+            if ($missing) {
                 $issues[] = ['level' => 'fatal', 'class' => $c['name'], 'member' => null, 'file' => $c['file'], 'line' => $c['line'],
                     'problem' => "Class induk {$c['extends']} tidak ada di framework ini", 'child' => null, 'parent' => null];
             }
@@ -670,7 +710,7 @@ function appParents(array $app, array $new, array $old): array
 }
 
 /** Calls to removed methods/functions or ones with more required parameters, plus libraries/helpers whose file is gone. */
-function findUsage(string $app, array $excludes, array $api, array $removedFiles): array
+function findUsage(string $app, array $excludes, array $api, array $removedFiles, ?array $adapter): array
 {
     $methods = [];
     foreach ($api['methods_removed'] as $m) {
@@ -694,9 +734,13 @@ function findUsage(string $app, array $excludes, array $api, array $removedFiles
             $funcs[strtolower($f['function'])][] = ['kind' => 'parameter wajib bertambah', 'what' => $f['function'] . '()', 'required' => $f['new_required']];
         }
     }
+    // Framework files loaded by name (adapter): $this->load->library('x') when libraries/X.php was removed.
     $libs = [];
-    foreach ($removedFiles as $f) {
-        if (preg_match('#(?:^|/)(libraries|helpers|drivers)/(?:.*/)?([A-Za-z_]+?)(?:_helper)?\.php$#', $f, $mm)) {
+    $loader = $adapter['loaders'] ?? null;
+    foreach ($loader === null ? [] : $removedFiles as $f) {
+        $dirs = implode('|', array_map('preg_quote', $loader['dirs']));
+        $suffix = preg_quote($loader['suffix'] ?? '');
+        if (preg_match('#(?:^|/)(' . $dirs . ')/(?:.*/)?([A-Za-z_]+?)(?:' . $suffix . ')?\.php$#', $f, $mm)) {
             $libs[strtolower($mm[2])] = $f;
         }
     }
@@ -709,8 +753,8 @@ function findUsage(string $app, array $excludes, array $api, array $removedFiles
             if ($sig[$i][0] !== T_STRING || ($sig[$i + 1][0] ?? null) !== '(') {
                 if ($sig[$i][0] === T_CONSTANT_ENCAPSED_STRING && $libs !== []) {
                     $v = strtolower(substr($sig[$i][1], 1, -1));
-                    $v = preg_replace('/_helper$/', '', $v);
-                    if (isset($libs[$v]) && in_array(strtolower($sig[$i - 2][1] ?? ''), ['library', 'helper', 'driver'], true)) {
+                    $v = preg_replace('/' . preg_quote($loader['suffix'] ?? '') . '$/', '', $v);
+                    if (isset($libs[$v]) && in_array(strtolower($sig[$i - 2][1] ?? ''), $loader['methods'], true)) {
                         $hits[] = ['file' => $rel, 'line' => $sig[$i][2], 'kind' => 'file framework dihapus', 'what' => $libs[$v], 'code' => $sig[$i - 2][1] . '(' . $sig[$i][1] . ')'];
                     }
                 }
@@ -809,12 +853,15 @@ function stringLiterals(string $root, array $excludes): array
  *  - new_keys: in the new default config, not in the application, and read by the new framework
  *  - unused_keys: in the application, read by the old framework, no longer read by the new one
  */
-function diffConfig(string $newDir, string $appDir, array $oldLits, array $newLits): array
+function diffConfig(string $newDir, string $appDir, array $oldLits, array $newLits, ?array $adapter): array
 {
     $out = [];
+    // Which arrays hold config: the adapter says (CI3: $config / $autoload); generically any $var['key'].
+    $vars = $adapter['config']['vars'] ?? null;
+    $varRe = $vars === null ? '/^\$\w+\[/' : '/^\$(' . implode('|', array_map('preg_quote', $vars)) . ')\[/';
     foreach (glob("$newDir/*.php") ?: [] as $f) {
         $base = basename($f);
-        if ($base === 'routes.php') {
+        if (in_array($base, $adapter['config']['skip'] ?? [], true)) {
             continue;
         }
         $appFile = "$appDir/$base";
@@ -823,7 +870,7 @@ function diffConfig(string $newDir, string $appDir, array $oldLits, array $newLi
             continue;
         }
         $key = fn (string $k) => preg_match("/\\['([^']+)'\\]$/", $k, $m) ? $m[1] : $k;
-        $onlyConfig = fn (array $keys) => array_filter($keys, fn ($k) => preg_match('/^\\$(config|autoload)\\[/', $k));
+        $onlyConfig = fn (array $keys) => array_filter($keys, fn ($k) => preg_match($varRe, $k));
         $a = $onlyConfig(array_keys(configKeys($f)));
         $b = $onlyConfig(array_keys(configKeys($appFile)));
         $newKeys = array_values(array_filter(array_diff($a, $b), fn ($k) => isset($newLits[$key($k)])));

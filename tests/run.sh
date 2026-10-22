@@ -106,6 +106,31 @@ done
 grep -q "$GHTOKEN" "$TMP/bad-out.json" && fail "validator output contains the secret"
 echo "validate notes: ok"
 
+# Framework comparison: deliberate conflicts are found, and --store adds a version per run
+F="$DIR/fixtures/framework"
+CMP=(--old="$F/old" --new="$F/new" --app="$F/app" --official="$F/official" --new-config="$F/new-config" --app-config="$F/app/config")
+php "$DIR/scripts/compare_framework.php" "${CMP[@]}" 2>/dev/null > "$TMP/cmp.json"
+php -r '
+$d = json_decode(file_get_contents($argv[1]), true);
+$o = array_map(fn ($x) => $x["class"] . "::" . $x["member"], $d["overrides"]["new"]);
+$u = array_column($d["usage"], "what");
+$need = ["MY_Input::post()", "MY_Email::send()", "Thing::"];
+$use = ["libraries/Encrypt.php", "helpers/legacy_helper.php", "CI_DB_query_builder::where_in()", "CI_Input::_clean_input_keys()", "legacy_thing()"];
+$miss = array_merge(array_diff($need, $o), array_diff($use, $u));
+if (($d["adapter"] ?? null) !== "codeigniter3") $miss[] = "adapter codeigniter3 not detected";
+if ($d["local_patches"]["changed"] !== ["libraries/Email.php"]) $miss[] = "local patch in libraries/Email.php";
+if (($d["config"][0]["new_keys"] ?? []) !== ["\$config[\x27new_key\x27]"]) $miss[] = "new config key";
+if ($miss) { fwrite(STDERR, "compare_framework missed: " . implode(", ", $miss) . "\n"); exit(1); }
+' "$TMP/cmp.json" || fail "compare_framework.php did not report the fixture conflicts"
+php "$DIR/scripts/compare_framework.php" "${CMP[@]}" --adapter=none 2>/dev/null > "$TMP/cmp-generic.json"
+grep -q '"MY_Input"' "$TMP/cmp-generic.json" || fail "generic comparison lost the signature conflict"
+grep -q 'Encrypt.php"' "$TMP/cmp-generic.json" && grep -q '"kind": "file framework dihapus"' "$TMP/cmp-generic.json" && fail "generic comparison used CodeIgniter loader rules"
+php "$DIR/scripts/compare_framework.php" "${CMP[@]}" --store="$STORE" --name="Framework merge" 2>/dev/null > /dev/null
+sleep 1
+php "$DIR/scripts/compare_framework.php" "${CMP[@]}" --store="$STORE" --name="Framework merge" 2>/dev/null > /dev/null
+[ "$(ls "$STORE/framework-merge/scans" | wc -l | tr -d ' ')" = "2" ] || fail "second comparison did not add a version"
+echo "compare framework: ok"
+
 # First run: --help everywhere, exit codes, --fail-on, PHP version warning
 for s in audit scan_code lint check_libs run_tools detect compare_framework render validate_notes load_classes; do
   [ -f "$DIR/scripts/$s.php" ] || continue

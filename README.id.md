@@ -128,7 +128,7 @@ Scan id berupa timestamp UTC (`20261022T131200Z`), jadi folder otomatis terurut 
 - Analisa statis tidak bisa melihat nilai saat runtime (mis. `null` yang dikirim ke fungsi bawaan). Laporan
   mencantumkan apa saja yang perlu diawasi saat aplikasi dijalankan di PHP target dengan `E_ALL`.
 - Katalog aturan mencakup PHP 7.1 → 8.5 sesuai php.net. Perbarui saat ada versi PHP baru (`references/rules.md`).
-- Bukti dengan memuat class (`ci3_link_app.php`) khusus CodeIgniter 3; framework lain butuh loader sendiri.
+- Bukti dengan memuat class (`scripts/adapters/codeigniter3/link_app.php`) khusus CodeIgniter 3; framework lain butuh loader sendiri.
 - PHPCompatibility 10 masih alpha; scanner dan `php -l` tidak bergantung padanya.
 
 ## Lisensi

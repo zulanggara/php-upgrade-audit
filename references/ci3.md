@@ -21,7 +21,7 @@
 - **`application/core/<prefix>*.php` and `application/libraries/<prefix>*.php`** extend CI classes. If a method
   signature in the new `system/` changes (added types or return types), an override with the old signature is
   a **fatal error when the class loads**. `php -l` does not catch it; `compare_framework.php` and
-  `ci3_link_app.php` do.
+  `adapters/codeigniter3/link_app.php` do.
 - **`index.php`** is often patched per company (e.g. an extra environment name). An environment that is not in
   the `switch (ENVIRONMENT)` answers every request with HTTP 503. Compare it by hand.
 - **Profiler** in CI 3.1.x uses `$this->_compile_{$section}`, which PHP 7 parsed as a string offset on
@@ -39,7 +39,7 @@ Only when asked. Everything stays read-only; work on copies.
    ```bash
    cd <app> && find controllers models core libraries migrations -name '*.php' | while read f; do
      printf '%s\t' "$f"
-     php -d error_reporting=-1 -d display_errors=0 <TOOL>/scripts/ci3_link_app.php <new/system> "$PWD" "$PWD/$f" | tail -1
+     php -d error_reporting=-1 -d display_errors=0 <TOOL>/scripts/adapters/codeigniter3/link_app.php <new/system> "$PWD" "$PWD/$f" | tail -1
    done
    ```
    "Cannot redeclare class" for classes already loaded through `core/<prefix>Controller.php` is an artefact of
