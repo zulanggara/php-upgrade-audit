@@ -60,6 +60,25 @@ grep -q '"docker/php/Dockerfile:1"' "$TMP/hints.json" || fail "PHP hint in docke
 grep -q '"value": "7.4"' "$TMP/hints.json" || fail "PHP hint in the CI workflow not found"
 echo "profile: ok"
 
+# Library status: an open constraint alone is not a reason to check by hand; a pre-PHP-8.0 release is
+if [ -f "$DIR/tools/vendor/autoload.php" ]; then
+  mkdir -p "$TMP/libs"
+  echo '{"require":{"php":">=8.1"}}' > "$TMP/libs/composer.json"
+  cat > "$TMP/libs/composer.lock" <<'JSON'
+{"packages":[
+ {"name":"acme/modern","version":"2.1.0","require":{"php":">=8.1"},"time":"2025-06-01T00:00:00+00:00","notification-url":"https://packagist.org/downloads/"},
+ {"name":"acme/ancient","version":"1.0.0","require":{"php":">=5.3"},"time":"2015-01-01T00:00:00+00:00","notification-url":"https://packagist.org/downloads/"},
+ {"name":"acme/old-only","version":"1.0.0","require":{"php":"^7.1"},"time":"2019-01-01T00:00:00+00:00","notification-url":"https://packagist.org/downloads/"}
+],"packages-dev":[]}
+JSON
+  php "$DIR/scripts/check_libs.php" "$TMP/libs" --target=8.5.12 --offline > "$TMP/libs.json"
+  php -r '
+  $s = array_column(json_decode(file_get_contents($argv[1]), true)["packages"], "status", "name");
+  $want = ["acme/modern" => "aman", "acme/ancient" => "cek-manual", "acme/old-only" => "tidak-didukung"];
+  if ($s !== $want) { fwrite(STDERR, json_encode($s) . "\n"); exit(1); }' "$TMP/libs.json" || fail "library statuses are wrong"
+  echo "library status: ok"
+fi
+
 # PHPCompatibility must find its standard even when Composer skipped its plugins (root, CI, --no-plugins)
 if [ -f "$DIR/tools/vendor/autoload.php" ]; then
   php "$DIR/scripts/run_tools.php" "$DIR/fixtures/legacy-app" --out="$TMP/tools" --only=phpcompat

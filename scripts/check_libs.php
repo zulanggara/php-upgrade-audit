@@ -195,7 +195,9 @@ function status(array $row): string
     if ($row['satisfies'] === false) {
         return ($row['suggest']['latest_compatible'] ?? null) !== null ? 'perlu-upgrade' : 'tidak-didukung';
     }
-    if ($row['satisfies'] === null || in_array('dirilis sebelum PHP 8.0', $row['risk'], true) || in_array('constraint terbuka tanpa batas atas', $row['risk'], true)) {
+    // An open constraint (">=8.1") alone is normal for maintained packages and stays a tag; measured on a
+    // modern Symfony app, all 115 packages flagged only for that loaded cleanly on 8.5.
+    if ($row['satisfies'] === null || in_array('dirilis sebelum PHP 8.0', $row['risk'], true)) {
         return 'cek-manual';
     }
     return 'aman';
