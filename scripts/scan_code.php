@@ -76,6 +76,8 @@ final class Scanner
     private array $lines = [];
     private string $file = '';
     private string $codeLower = '';
+    /** rule id => whether only_if_mentioned matches the current file (computed once per file). */
+    private array $mentionCache = [];
     /** Index (in $sig) of the token being reported, for the code excerpt. */
     private int $at = 0;
 
@@ -115,6 +117,7 @@ final class Scanner
         $code = (string) file_get_contents($path);
         $this->file = $rel;
         $this->codeLower = strtolower($code);
+        $this->mentionCache = [];
         $this->lines = preg_split('/\R/', $code) ?: [];
         $this->tokenize($code);
         $this->scanTokens();
@@ -701,12 +704,17 @@ final class Scanner
     /** only_if_mentioned: the file must contain one of these names (case-insensitive) for the rule to apply. */
     private function mentioned(array $r): bool
     {
-        foreach ((array) ($r['only_if_mentioned'] ?? []) as $needle) {
-            if (str_contains($this->codeLower, strtolower($needle))) {
-                return true;
-            }
+        if (!isset($r['only_if_mentioned'])) {
+            return true;
         }
-        return !isset($r['only_if_mentioned']);
+        return $this->mentionCache[$r['id']] ??= (function () use ($r): bool {
+            foreach ((array) $r['only_if_mentioned'] as $needle) {
+                if (str_contains($this->codeLower, strtolower($needle))) {
+                    return true;
+                }
+            }
+            return false;
+        })();
     }
 
     private function checkConst(int $i): void
