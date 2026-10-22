@@ -162,6 +162,7 @@ for lang in en id; do
   grep -q "$DIR" "$TMP/report-$lang.html" && fail "report contains a local absolute path"
   grep -qE '/home/someone|/Users/someone' "$TMP/report-$lang.html" && fail "report contains a home folder path"
   if command -v node >/dev/null 2>&1; then
+    node "$DIR/tests/i18n_check.js" "$DIR/assets/report-template.html" > /dev/null || fail "report template I18N has duplicate or missing keys"
     sed -n '/^<script>$/,/^<\/script>$/p' "$TMP/report-$lang.html" | sed '1d;$d' > "$TMP/check.js"
     node --check "$TMP/check.js" || fail "report script does not parse ($lang)"
   fi
