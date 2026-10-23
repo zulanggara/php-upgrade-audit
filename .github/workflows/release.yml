@@ -3,7 +3,9 @@ name: release
 # On main: when .claude-plugin/plugin.json has a version without a tag, tag the commit v<version> and publish a
 # GitHub release with that version's CHANGELOG section. Plugin users only get an update when the version
 # changes, so a push to main that changes the kit but not the version gets a warning.
-# Run it by hand to tag an older version at a given commit (version and ref inputs).
+# Run it by hand to tag an older version at a given commit (version and ref inputs). GitHub refuses that when
+# the commit's workflow files differ from today's (the Actions token cannot hold the "workflows" permission):
+# push such a tag yourself (git tag v1.0.0 <commit> && git push origin v1.0.0) and run this to add the release.
 on:
   push:
     branches: [main]
@@ -38,7 +40,7 @@ jobs:
           ref="${INPUT_REF:-$GITHUB_SHA}"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version '$version' is not x.y.z"; exit 1; }
           tag="v$version"
-          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null && { [ -z "$INPUT_VERSION" ] || gh release view "$tag" > /dev/null 2>&1; }; then
             echo "$tag exists."
             # The kit changed since that tag but the version did not: plugin users will not get it.
             if [ -z "$INPUT_VERSION" ] && ! git diff --quiet "$tag" "$ref" -- . ':!tests' ':!examples' ':!evals' ':!.github' ':!README*.md' ':!CHANGELOG.md' ':!CONTRIBUTING.md' ':!SECURITY.md'; then
@@ -49,7 +51,10 @@ jobs:
           notes="$(awk -v v="$version" '$0 ~ "^## " v "( |$)" {f=1; next} f && /^## / {exit} f' CHANGELOG.md)"
           [ -n "$notes" ] || { echo "::error::CHANGELOG.md has no '## $version' section."; exit 1; }
           printf '%s\n' "$notes" > "$RUNNER_TEMP/notes.md"
-          git tag "$tag" "$ref"
-          git push origin "$tag"
-          gh release create "$tag" --verify-tag --title "$tag" --notes-file "$RUNNER_TEMP/notes.md"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            git tag "$tag" "$ref"
+            git push origin "$tag"
+          fi
+          # An older version added by hand must not become the "Latest" release.
+          gh release create "$tag" --verify-tag --title "$tag" --notes-file "$RUNNER_TEMP/notes.md" --latest=$([ -z "$INPUT_VERSION" ] && echo true || echo false)
           echo "Released $tag at $ref."
