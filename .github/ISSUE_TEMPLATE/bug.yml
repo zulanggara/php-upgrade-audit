@@ -1,0 +1,38 @@
+name: Bug in a script or the report
+description: A script fails, gives a wrong result, or the report shows something wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste secrets, private code or private paths.** Tool output is redacted, but check what you paste.
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: php scripts/audit.php <repo> --out=~/php-audit-store --load-classes
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output (last lines, redacted)
+      render: text
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, php -v, composer --version, and the kit version from the report footer.
+    validations:
+      required: true
+  - type: dropdown
+    id: project
+    attributes:
+      label: Kind of project audited
+      options: [Laravel, Symfony, WordPress, CodeIgniter, Plain PHP, Other]

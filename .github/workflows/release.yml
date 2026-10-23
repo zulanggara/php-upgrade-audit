@@ -1,0 +1,55 @@
+name: release
+
+# On main: when .claude-plugin/plugin.json has a version without a tag, tag the commit v<version> and publish a
+# GitHub release with that version's CHANGELOG section. Plugin users only get an update when the version
+# changes, so a push to main that changes the kit but not the version gets a warning.
+# Run it by hand to tag an older version at a given commit (version and ref inputs).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to tag (default: the one in plugin.json)
+        required: false
+      ref:
+        description: Commit to tag (default: the current commit)
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION:-$(jq -r .version .claude-plugin/plugin.json)}"
+          ref="${INPUT_REF:-$GITHUB_SHA}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version '$version' is not x.y.z"; exit 1; }
+          tag="v$version"
+          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+            echo "$tag exists."
+            # The kit changed since that tag but the version did not: plugin users will not get it.
+            if [ -z "$INPUT_VERSION" ] && ! git diff --quiet "$tag" "$ref" -- . ':!tests' ':!examples' ':!evals' ':!.github' ':!*.md'; then
+              echo "::warning::The kit changed since $tag but .claude-plugin/plugin.json still says $version. Plugin users get the change only after the version is raised (and a CHANGELOG entry added)."
+            fi
+            exit 0
+          fi
+          notes="$(awk -v v="$version" '$0 ~ "^## " v "( |$)" {f=1; next} f && /^## / {exit} f' CHANGELOG.md)"
+          [ -n "$notes" ] || { echo "::error::CHANGELOG.md has no '## $version' section."; exit 1; }
+          printf '%s\n' "$notes" > "$RUNNER_TEMP/notes.md"
+          git tag "$tag" "$ref"
+          git push origin "$tag"
+          gh release create "$tag" --verify-tag --title "$tag" --notes-file "$RUNNER_TEMP/notes.md"
+          echo "Released $tag at $ref."

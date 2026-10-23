@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security problem (a secret in a report, a write into an audited repo)
+    url: https://github.com/zulanggara/php-upgrade-audit/security/advisories/new
+    about: Report it privately. Never paste real secrets; see SECURITY.md.

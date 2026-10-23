@@ -1,0 +1,52 @@
+name: Wrong finding (false positive or a miss)
+description: The scanner reports correct code, or misses a real PHP upgrade problem.
+title: "[rule] <RULE-ID>: "
+labels: [false-positive]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. A report with a small code sample becomes a fixture in `fixtures/` and a test, so the rule
+        stays fixed. **Do not paste secrets or private code**: reduce it to a few made-up lines that still show it.
+  - type: input
+    id: rule
+    attributes:
+      label: Rule id
+      description: As shown in the report or scan.json (e.g. P80-LOOSE-CMP). Leave empty for a miss.
+      placeholder: P80-LOOSE-CMP
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What happened
+      options:
+        - Reported, but the code is correct on the target PHP (false positive)
+        - Not reported, but the code breaks or is deprecated on the target PHP (miss)
+        - Reported with the wrong severity, line or advice
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Minimal code
+      description: The smallest made-up sample that shows it.
+      render: php
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: Target PHP and the PHP that ran the audit
+      placeholder: "target 8.5.12, php -v 8.5.12"
+    validations:
+      required: true
+  - type: textarea
+    id: proof
+    attributes:
+      label: What the target PHP does
+      description: Output of running the sample on the target PHP (php -l, or php file.php), or a php.net / php-src link.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Kit version
+      description: The footer of the report shows it (php-upgrade-audit 1.2.0 (commit)).
