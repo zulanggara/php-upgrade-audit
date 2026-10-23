@@ -242,9 +242,17 @@ function composerInstall(string $php, string $work, bool $offline, bool $dev): a
         return ['ok' => false, 'message' => 'composer not found in PATH'];
     }
     // Run Composer with the target PHP when it is a PHP script or phar, so platform checks use that version.
+    // PHP in Docker (--php=docker) has no network and no Composer: Composer then runs here, told that the
+    // platform is the container's PHP version, which gives the same platform checks.
     $head = (string) @file_get_contents($composer, false, null, 0, 200);
-    $base = str_contains($head, 'php') || str_starts_with($head, "\x3c?php") ? [$php, $composer] : [$composer];
-    $key = md5(@file_get_contents("$work/composer.json") . @file_get_contents("$work/composer.lock") . $php . ($dev ? 'dev' : '') . ($offline ? 'off' : ''));
+    $isScript = str_contains($head, 'php') || str_starts_with($head, "\x3c?php");
+    $version = trim((string) shell_exec(escapeshellarg($php) . ' -r "echo PHP_VERSION;" 2>/dev/null'));
+    $docker = str_contains((string) @file_get_contents($php, false, null, 0, 200), 'in container php-upgrade-audit-');
+    $base = $isScript ? [$docker ? PHP_BINARY : $php, $composer] : [$composer];
+    if ($docker && $version !== '') {
+        runCmd([...$base, 'config', '--no-interaction', "--working-dir=$work", 'platform.php', $version]);
+    }
+    $key = md5(@file_get_contents("$work/composer.json") . @file_get_contents("$work/composer.lock") . ($docker ? "docker-$version" : $php) . ($dev ? 'dev' : '') . ($offline ? 'off' : ''));
     $result = ['ok' => true, 'message' => '', 'platform_php_ignored' => false, 'reused' => false, 'lock' => is_file("$work/composer.lock")];
     $common = ['--no-interaction', '--no-scripts', '--no-plugins', "--working-dir=$work"];
     if ($offline) {
@@ -260,7 +268,7 @@ function composerInstall(string $php, string $work, bool $offline, bool $dev): a
         if ($code !== 0 && preg_match('/requires php|php version|__root__ requires php|your php version/i', $o)) {
             $result['platform_php_ignored'] = true;
             $result['message'] = ($result['lock'] ? 'composer.lock does not' : 'The composer.json dependencies (no composer.lock) do not') . ' install on PHP '
-                . trim((string) shell_exec(escapeshellarg($php) . ' -r "echo PHP_VERSION;"')) . ' without ignoring the php requirement: ' . lastLines($o);
+                . $version . ' without ignoring the php requirement: ' . lastLines($o);
             [$code, $o] = runCmd([...$args, '--ignore-platform-req=php']);
         }
         if ($code !== 0) {

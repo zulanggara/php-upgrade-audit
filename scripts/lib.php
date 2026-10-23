@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/redact.php';
 
-/** Newest PHP version the rule catalogue covers. It is the default --target, and what --target=latest means. */
+/** Newest PHP minor version the rule catalogue covers. */
+const RULES_COVER = '8.5';
+/**
+ * Newest release of RULES_COVER known when this kit was released. --target=latest (the default) asks php.net for
+ * the newest release instead and falls back to this when php.net cannot be reached or --offline is given.
+ */
 const LATEST_TARGET = '8.5.12';
+const RELEASES_URL = 'https://www.php.net/releases/index.php?json&version={version}';
 
 const DEFAULT_EXCLUDES =['vendor', 'node_modules', '.git', '.svn', '.idea', '.vscode', 'storage', 'bootstrap/cache', 'var/cache', 'cache', 'tmp'];
 const PHP_EXTS = ['php', 'phtml', 'inc', 'module', 'install', 'theme'];
@@ -92,18 +98,106 @@ function absPath(string $path): string
     return $base . ($rest === [] ? '' : '/' . implode('/', $rest));
 }
 
-/** --target as a full version (x.y or x.y.z); "latest" or no value means LATEST_TARGET. */
+/**
+ * --target as a full version. No value or "latest": the newest release of the newest minor the rules cover
+ * (RULES_COVER), from php.net; a minor alone ("8.3") becomes its newest release. Without network (--offline,
+ * php.net unreachable) "latest" is LATEST_TARGET and a minor stays as given.
+ */
 function targetFrom(array $argv): string
 {
-    $t = opt($argv, 'target', LATEST_TARGET);
+    $t = opt($argv, 'target', 'latest');
     if ($t === 'latest' || $t === '1') {
-        return LATEST_TARGET;
+        return latestRelease(RULES_COVER, opt($argv, 'offline') !== null) ?? LATEST_TARGET;
     }
     if (!preg_match('/^[78]\.\d+(\.\d+)?$/', $t)) {
-        fwrite(STDERR, "Invalid --target=$t. Use a PHP version such as 8.3, 8.3.30 or 8.5.12, or --target=latest (" . LATEST_TARGET . ").\n");
+        fwrite(STDERR, "Invalid --target=$t. Use a PHP version such as 8.3, 8.3.30 or 8.5.12, or --target=latest (the newest PHP " . RULES_COVER . " release).\n");
         exit(1);
     }
+    if (preg_match('/^\d+\.\d+$/', $t)) {
+        return latestRelease($t, opt($argv, 'offline') !== null) ?? $t;
+    }
     return $t;
+}
+
+/**
+ * Newest released version of $branch ("8.5", or "8" for the newest PHP 8 of all) according to php.net, or null
+ * when offline or unreachable. Answers are cached for a day in tools/.php-releases.json.
+ * PHP_UPGRADE_AUDIT_RELEASES_URL replaces the php.net URL ({version} is the branch), e.g. for tests.
+ */
+function latestRelease(string $branch, bool $offline = false): ?string
+{
+    if ($offline) {
+        return null;
+    }
+    static $memo = [];
+    if (array_key_exists($branch, $memo)) {
+        return $memo[$branch];
+    }
+    $custom = getenv('PHP_UPGRADE_AUDIT_RELEASES_URL') ?: null;
+    $cacheFile = dirname(__DIR__) . '/tools/.php-releases.json';
+    $cache = $custom === null ? json_decode((string) @file_get_contents($cacheFile), true) : null;
+    $cache = is_array($cache) ? $cache : [];
+    if (isset($cache[$branch]['version'], $cache[$branch]['at']) && $cache[$branch]['at'] > time() - 86400) {
+        return $memo[$branch] = $cache[$branch]['version'];
+    }
+    $url = str_replace('{version}', rawurlencode($branch), $custom ?? RELEASES_URL);
+    $ctx = stream_context_create(['http' => ['timeout' => 8, 'user_agent' => 'php-upgrade-audit']]);
+    $json = json_decode((string) @file_get_contents($url, false, $ctx), true);
+    $version = is_array($json) && is_string($json['version'] ?? null) && preg_match('/^\d+\.\d+\.\d+$/', $json['version'])
+        && ($branch === explode('.', $json['version'])[0] || str_starts_with($json['version'], "$branch.")) ? $json['version'] : null;
+    if ($version !== null && $custom === null && is_dir(dirname($cacheFile)) && is_writable(dirname($cacheFile))) {
+        $cache[$branch] = ['version' => $version, 'at' => time()];
+        @file_put_contents($cacheFile, json_encode($cache, JSON_PRETTY_PRINT) . "\n");
+    }
+    return $memo[$branch] = $version;
+}
+
+/**
+ * --php=docker or --php=docker:<version|image>: run PHP in a container instead of a local binary. One container
+ * is started for the whole audit (no network, the repo and the tool folder read-only, $writable read-write) and a
+ * small wrapper script that runs "docker exec ... php" is returned, so every script can use it like a binary.
+ * "docker" uses the official image of the target (php:8.5.12-cli); "docker:8.3" uses php:8.3-cli; anything with
+ * a ":" or "/" after "docker:" is used as the image name. The container is removed when this process ends.
+ */
+function dockerPhp(string $spec, string $target, array $readOnly, array $writable, string $workDir): string
+{
+    $tag = $spec === 'docker' ? $target : substr($spec, 7);
+    if ($tag === '' || !preg_match('#^[A-Za-z0-9._/:@-]+$#', $tag)) {
+        usageError("--php=$spec: expected docker, docker:<version> (e.g. docker:8.3) or docker:<image>.", 'scripts/audit.php');
+    }
+    $image = str_contains($tag, ':') || str_contains($tag, '/') ? $tag : "php:$tag-cli";
+    if (trim((string) shell_exec('command -v docker 2>/dev/null')) === '') {
+        fwrite(STDERR, "Error: --php=$spec needs Docker, and docker is not installed.\n");
+        exit(EXIT_ENV);
+    }
+    $name = 'php-upgrade-audit-' . getmypid() . '-' . bin2hex(random_bytes(3));
+    $mounts = [];
+    foreach (array_unique(array_filter($readOnly)) as $dir) {
+        $mounts[] = '-v ' . escapeshellarg("$dir:$dir:ro");
+    }
+    foreach (array_unique(array_filter($writable)) as $dir) {
+        $mounts[] = '-v ' . escapeshellarg("$dir:$dir");
+    }
+    $user = function_exists('posix_getuid') ? posix_getuid() . ':' . posix_getgid() : trim((string) shell_exec('id -u')) . ':' . trim((string) shell_exec('id -g'));
+    // "sleep" bounds the life of a container left behind by a killed audit; --rm removes it once it stops.
+    $cmd = 'docker run -d --rm --network none --name ' . escapeshellarg($name) . ' -u ' . escapeshellarg($user) . ' -e HOME=/tmp '
+        . implode(' ', $mounts) . ' --entrypoint sleep ' . escapeshellarg($image) . ' 21600 2>&1';
+    fwrite(STDERR, "Starting PHP in Docker ($image; the image is downloaded the first time)...\n");
+    exec($cmd, $output, $code);
+    if ($code !== 0) {
+        fwrite(STDERR, "Error: could not start $image: " . trim(implode("\n", array_slice($output, -3))) . "\n");
+        exit(EXIT_ENV);
+    }
+    register_shutdown_function(fn () => exec('docker rm -f ' . escapeshellarg($name) . ' >/dev/null 2>&1'));
+    @mkdir($workDir, 0700, true);
+    $wrapper = "$workDir/php-$name";
+    $inside = implode('|', array_map(fn ($d) => preg_replace('/[^A-Za-z0-9._\/-]/', '?', $d) . '|' . preg_replace('/[^A-Za-z0-9._\/-]/', '?', $d) . '/*', array_unique(array_filter([...$readOnly, ...$writable]))));
+    file_put_contents($wrapper, "#!/bin/sh\n# PHP $image in container $name (removed when the audit ends).\n"
+        . "case \"\$PWD\" in $inside) w=\"\$PWD\" ;; *) w=/ ;; esac\n"
+        . 'exec docker exec -i -w "$w" ' . escapeshellarg($name) . " php \"\$@\"\n");
+    chmod($wrapper, 0700);
+    register_shutdown_function(fn () => @unlink($wrapper));
+    return $wrapper;
 }
 
 /** "8.5.12" → "8.5" */

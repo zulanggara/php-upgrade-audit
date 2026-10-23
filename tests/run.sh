@@ -6,6 +6,8 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
+# No php.net in the tests: "latest" falls back to LATEST_TARGET (the "target latest" block fakes php.net).
+export PHP_UPGRADE_AUDIT_RELEASES_URL="file://$TMP/no-releases/{version}.json"
 
 php "$DIR/tests/redact_test.php"
 
@@ -104,6 +106,24 @@ php "$DIR/scripts/detect.php" "$TMP/hints" > "$TMP/hints.json"
 grep -q '"docker/php/Dockerfile:1"' "$TMP/hints.json" || fail "PHP hint in docker/php/Dockerfile not found"
 grep -q '"value": "7.4"' "$TMP/hints.json" || fail "PHP hint in the CI workflow not found"
 echo "profile: ok"
+
+# --target=latest (the default) and a bare minor take the newest release from php.net; offline: LATEST_TARGET
+mkdir -p "$TMP/releases"
+echo '{"version":"8.5.13"}' > "$TMP/releases/8.5.json"
+echo '{"version":"8.6.0"}' > "$TMP/releases/8.json"
+echo '{"version":"8.3.36"}' > "$TMP/releases/8.3.json"
+latest_of() { PHP_UPGRADE_AUDIT_RELEASES_URL="file://$TMP/releases/{version}.json" php "$DIR/scripts/audit.php" "$TMP/hints" --out="$TMP/st-latest" --skip=libs,phpcompat,rector "$@" 2> "$TMP/latest.err" \
+  | xargs php -r 'echo json_decode(file_get_contents($argv[1]), true)["target"];'; }
+[ "$(latest_of)" = "8.5.13" ] || fail "default target is not the newest 8.5 release from php.net"
+grep -q 'PHP 8.6.0 is out' "$TMP/latest.err" || fail "no note that a newer PHP than the rules exists"
+[ "$(latest_of --target=latest)" = "8.5.13" ] || fail "--target=latest is not the newest release"
+[ "$(latest_of --target=8.3)" = "8.3.36" ] || fail "--target=8.3 is not the newest 8.3 release"
+[ "$(latest_of --target=8.3.30)" = "8.3.30" ] || fail "an exact --target was changed"
+[ "$(latest_of --offline)" = "$(php -r 'require $argv[1]; echo LATEST_TARGET;' "$DIR/scripts/lib.php")" ] || fail "--offline: target is not LATEST_TARGET"
+grep -q 'is out' "$TMP/latest.err" && fail "--offline still asked php.net"
+echo '{"error":"Unknown version"}' > "$TMP/releases/8.5.json"
+[ "$(latest_of)" = "8.5.12" ] || fail "an unusable php.net answer did not fall back to LATEST_TARGET"
+echo "target latest: ok"
 
 # Libraries committed into a repo without Composer: found with their versions and checked against the target
 php "$DIR/scripts/detect.php" "$DIR/fixtures/plain-app" > "$TMP/plain-profile.json"
@@ -354,6 +374,24 @@ fi
 php "$DIR/scripts/audit.php" "$DIR/fixtures/plain-app" --out="$TMP/rtstore" --skip=rector,phpcompat,libs --offline --load-classes > /dev/null 2>&1
 grep -q '"tool": "load_classes"' "$TMP/rtstore"/plain-app/scans/*/report.json || fail "audit.php --load-classes did not store the runtime proof"
 echo "load classes (files): ok"
+
+# PHP in Docker (--php=docker): same runtime proof as a local binary, nothing left behind
+if [ "${PHP_UPGRADE_AUDIT_TEST_DOCKER:-auto}" != "0" ] && docker info > /dev/null 2>&1 && command -v composer > /dev/null 2>&1; then
+  php "$DIR/scripts/audit.php" "$DIR/fixtures/composer-app" --out="$TMP/st-docker" --target=8.5.12 --php=docker --load-classes --skip=libs,phpcompat,rector > "$TMP/dk.out" 2> "$TMP/dk.err" \
+    || fail "audit --php=docker failed: $(tail -3 "$TMP/dk.err")"
+  php -r '$r = json_decode(file_get_contents(trim(file_get_contents($argv[1]))), true);
+    $ok = $r["php_runtime"] === "8.5.12" && $r["lint"]["php"] === "8.5.12" && $r["runtime"]["php"] === "8.5.12"
+       && array_column($r["runtime"]["failed"], "type", "unit") === ["App\\Model\\Report" => "signature"] && $r["runtime"]["loaded"] === 4;
+    if (!$ok) { fwrite(STDERR, json_encode($r["runtime"], JSON_PRETTY_PRINT)); exit(1); }' "$TMP/dk.out" || fail "--php=docker did not prove the fixture on PHP 8.5.12"
+  [ -n "$(docker ps -aq --filter name=php-upgrade-audit-)" ] && fail "--php=docker left a container behind"
+  [ -n "$(ls -A "$TMP/st-docker/.cache/docker" 2>/dev/null)" ] && fail "--php=docker left its wrapper behind"
+  [ -d "$DIR/fixtures/composer-app/vendor" ] && fail "--php=docker installed into the audited repo"
+  code=0; php "$DIR/scripts/audit.php" "$DIR/fixtures/composer-app" --out="$TMP/st-docker" --php='docker:8.5;rm' > /dev/null 2>&1 || code=$?
+  [ $code = 1 ] || fail "--php=docker with an unsafe tag was not refused (exit $code)"
+  echo "php in docker: ok"
+else
+  echo "php in docker: skipped (no docker daemon or composer)"
+fi
 
 # First run: --help everywhere, exit codes, --fail-on, PHP version warning
 for s in audit scan_code lint check_libs run_tools detect compare_framework render validate_notes load_classes; do

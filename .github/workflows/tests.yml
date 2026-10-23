@@ -30,6 +30,9 @@ jobs:
 
       - name: Tests
         run: bash tests/run.sh
+        env:
+          # The --php=docker test pulls php:8.5.12-cli: once is enough.
+          PHP_UPGRADE_AUDIT_TEST_DOCKER: ${{ matrix.php == '8.5' && 'auto' || '0' }}
 
       - name: Audit the sample project (smoke test, all tools)
         run: |

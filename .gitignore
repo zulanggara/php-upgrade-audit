@@ -20,3 +20,4 @@ report.html
 # update check stamp and setup log (scripts/update.sh)
 /tools/.update-check
 /tools/.setup.log
+/tools/.php-releases.json

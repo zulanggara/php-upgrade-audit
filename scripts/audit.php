@@ -32,12 +32,16 @@ Options:
                        reported, and Rector/PHPCompatibility use the target's minor version.
   --php=<binary>       PHP binary used for "php -l" and class loading (default: the PHP running this script).
                        It should be the target version: those two steps prove behaviour on that binary.
+  --php=docker         The same in Docker with the official image of the target (php:<target>-cli), when the
+                       target PHP is not installed. docker:8.3 picks another version, docker:<image> any image.
+                       The container has no network, sees the repo read-only and is removed afterwards.
   --exclude=a,b        Extra folders to skip (vendor, node_modules, .git, cache... are always skipped).
   --skip=a,b           Steps to skip: libs, phpcompat, rector.
   --load-classes       Also load every application class on --php (Composer autoload or plain files), in a
                        scratch copy. Slower; see scripts/load_classes.php --help.
   --memory=<size>      memory_limit for PHPCompatibility and Rector (default 2G); raise it for big repos.
-  --offline            No network at all (otherwise only public package names go to repo.packagist.org).
+  --offline            No network at all (otherwise public package names go to repo.packagist.org, and the
+                       newest PHP version is asked from php.net).
   --fail-on=<level>    For CI: exit 10 when there are findings at this level or above.
                        Levels, highest first: wajib (must fix) > deprecated > perilaku (behaviour change).
   --help               This text.
@@ -88,11 +92,15 @@ if (!@mkdir($out, 0700, true) && !is_dir($out)) {
 }
 $out = realpath($out);
 $target = targetFrom($argv);
+fwrite(STDERR, "Target: PHP $target" . (in_array(opt($argv, 'target', 'latest'), ['latest', '1'], true) ? ' (latest)' : '') . "\n");
 $name = opt($argv, 'name', basename($repo));
 $skip = array_filter(explode(',', (string) opt($argv, 'skip', '')));
 $exclude = opt($argv, 'exclude');
-$php = opt($argv, 'php', PHP_BINARY);
 $offline = opt($argv, 'offline') !== null;
+$php = opt($argv, 'php', PHP_BINARY);
+if ($php === 'docker' || str_starts_with($php, 'docker:')) {
+    $php = dockerPhp($php, $target, [$repo, dirname(__DIR__)], [$out, rtrim(sys_get_temp_dir(), '/')], "$out/.cache/docker");
+}
 
 // The runtime steps (php -l, class loading) prove behaviour on $php, so it should be the target version.
 $phpVersion = trim((string) shell_exec(escapeshellarg($php) . ' -r "echo PHP_VERSION;" 2>/dev/null'));
@@ -105,8 +113,12 @@ if (targetMinor($phpVersion) !== targetMinor($target)) {
         . "         Those results show PHP $phpVersion behaviour, and guards such as function_exists()/class_exists() are left as \"?\".\n"
         . "         Install the target PHP and use it as php, or pass --php=/path/to/php" . targetMinor($target) . ".\n");
 }
-if (version_compare(targetMinor($target), targetMinor(LATEST_TARGET), '>')) {
-    fwrite(STDERR, "Warning: the rule catalogue covers changes up to PHP " . targetMinor(LATEST_TARGET) . "; changes made in PHP " . targetMinor($target) . " are not checked by the scanner.\n");
+if (version_compare(targetMinor($target), RULES_COVER, '>')) {
+    fwrite(STDERR, "Warning: the rule catalogue covers changes up to PHP " . RULES_COVER . "; changes made in PHP " . targetMinor($target) . " are not checked by the scanner.\n");
+}
+$newest = latestRelease('8', $offline);
+if (in_array(opt($argv, 'target', 'latest'), ['latest', '1'], true) && $newest !== null && version_compare(targetMinor($newest), RULES_COVER, '>')) {
+    fwrite(STDERR, "Note: PHP $newest is out, but the rule catalogue covers up to PHP " . RULES_COVER . ", so the target is $target. Update this kit (scripts/update.sh), or pass --target=$newest to check the rest by hand.\n");
 }
 if (toolsVendor() === null) {
     fwrite(STDERR, "Warning: " . SETUP_HINT . "\n         Without them the library check, PHPCompatibility and Rector are skipped; the scanner and php -l still run.\n");
