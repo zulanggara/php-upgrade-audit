@@ -236,6 +236,22 @@ SECOND="$(ls "$STORE/legacy-app/scans" | tail -1)"
 grep -q '"carried_from"' "$STORE/legacy-app/scans/$SECOND/notes.json" || fail "notes were not carried over"
 echo "history: ok"
 
+# SARIF for code scanning: one result per counted finding, levels by severity, never written into the repo
+php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$TMP/st-sarif" --name=legacy-app --offline --skip=phpcompat,rector --sarif="$TMP/out.sarif" > /dev/null 2> "$TMP/sarif.err" \
+  || fail "audit --sarif failed: $(tail -3 "$TMP/sarif.err")"
+php -r '
+$s = json_decode(file_get_contents($argv[1]), true); $run = $s["runs"][0];
+preg_match("/wajib (\d+), deprecated (\d+), perilaku (\d+)/", file_get_contents($argv[2]), $m);
+$lv = array_count_values(array_column($run["results"], "level"));
+$ids = array_column($run["tool"]["driver"]["rules"], "id");
+$ok = $s["version"] === "2.1.0" && ($lv["error"] ?? 0) === (int) $m[1] && ($lv["warning"] ?? 0) === (int) $m[2] && ($lv["note"] ?? 0) >= (int) $m[3]
+   && in_array("LINT-ERROR", $ids, true) && in_array("P82-DOLLAR-BRACE", $ids, true)
+   && array_filter($run["results"], fn ($r) => $r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] === "src/Legacy.php") !== [];
+if (!$ok) { fwrite(STDERR, json_encode($lv) . " vs " . ($m[0] ?? "?") . "\n"); exit(1); }' "$TMP/out.sarif" "$TMP/sarif.err" || fail "SARIF does not match the findings"
+code=0; php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$TMP/st-sarif" --sarif="$DIR/fixtures/legacy-app/x.sarif" --offline > /dev/null 2>&1 || code=$?
+[ $code = 1 ] && [ ! -e "$DIR/fixtures/legacy-app/x.sarif" ] || fail "--sarif inside the audited repo was not refused"
+echo "sarif: ok"
+
 # Render in both languages, offline, without local paths
 for lang in en id; do
   php "$DIR/scripts/render.php" --store="$STORE" --out="$TMP/report-$lang.html" --lang="$lang" --offline 2>/dev/null

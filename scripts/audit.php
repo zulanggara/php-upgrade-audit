@@ -42,6 +42,7 @@ Options:
   --memory=<size>      memory_limit for PHPCompatibility and Rector (default 2G); raise it for big repos.
   --offline            No network at all (otherwise public package names go to repo.packagist.org, and the
                        newest PHP version is asked from php.net).
+  --sarif=<file>       Also write the findings as SARIF 2.1.0 (GitHub code scanning), outside the repo.
   --fail-on=<level>    For CI: exit 10 when there are findings at this level or above.
                        Levels, highest first: wajib (must fix) > deprecated > perilaku (behaviour change).
   --help               This text.
@@ -75,6 +76,10 @@ if (!is_dir($repo)) {
 if ($out === null || $out === '1') {
     usageError('--out=<store> is required (a folder outside the repo, e.g. --out=~/php-audit-store).', 'scripts/audit.php');
 }
+$sarif = opt($argv, 'sarif');
+if ($sarif === '1') {
+    usageError('--sarif needs a file, e.g. --sarif=$RUNNER_TEMP/php-upgrade.sarif.', 'scripts/audit.php');
+}
 $failOn = opt($argv, 'fail-on');
 if ($failOn !== null && !isset(LEVELS[$failOn])) {
     usageError("--fail-on must be one of: " . implode(', ', array_keys(LEVELS)) . '.', 'scripts/audit.php');
@@ -83,6 +88,9 @@ $repo = rtrim(realpath($repo), '/');
 $outInput = $out;
 $out = absPath($out);
 // Checked before anything is created: the audited repo is never written to, not even an empty folder.
+if ($sarif !== null && str_starts_with(absPath($sarif) . '/', $repo . '/')) {
+    usageError("the SARIF file must not be inside the audited repo ($sarif). Write it to e.g. \$RUNNER_TEMP.", 'scripts/audit.php');
+}
 if (str_starts_with($out . '/', $repo . '/')) {
     usageError("the output folder must not be inside the audited repo ($outInput). Use a folder outside it, e.g. --out=~/php-audit-store.", 'scripts/audit.php');
 }
@@ -178,6 +186,10 @@ writeJson("$dir/report.json", $report);
 $carried = $previous !== null && history_carry_notes($entity, $previous['id'], $dir);
 history_add($entity, $name, 'repo', $id, ['generated_at' => $report['generated_at'], 'target' => $target, 'git' => $report['profile']['git'] ?? null]);
 
+if ($sarif !== null) {
+    [$code, , $err] = runScript('sarif.php', ["$dir/report.json", "--repo=$repo", '--out=' . absPath($sarif)]);
+    fwrite(STDERR, $code === 0 ? "[$name] " . trim($err) . "\n" : "[$name] SARIF failed: " . trim($err) . "\n");
+}
 $counts = countByLevel($report);
 fwrite(STDERR, "[$name] done: scan $id" . ($previous ? " (previous: {$previous['id']}" . ($carried ? ', notes carried over for review' : '') . ')' : ' (first scan)') . "\n");
 fwrite(STDERR, sprintf("[%s] findings: wajib %d, deprecated %d, perilaku %d (lint errors, unsupported libraries and security advisories count as wajib)\n", $name, $counts['wajib'], $counts['deprecated'], $counts['perilaku']));
