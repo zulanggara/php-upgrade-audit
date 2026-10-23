@@ -10,10 +10,10 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to tag (default: the one in plugin.json)
+        description: 'Version to tag (default: the one in plugin.json)'
         required: false
       ref:
-        description: Commit to tag (default: the current commit)
+        description: 'Commit to tag (default: the current commit)'
         required: false
 
 permissions:
@@ -41,7 +41,7 @@ jobs:
           if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
             echo "$tag exists."
             # The kit changed since that tag but the version did not: plugin users will not get it.
-            if [ -z "$INPUT_VERSION" ] && ! git diff --quiet "$tag" "$ref" -- . ':!tests' ':!examples' ':!evals' ':!.github' ':!*.md'; then
+            if [ -z "$INPUT_VERSION" ] && ! git diff --quiet "$tag" "$ref" -- . ':!tests' ':!examples' ':!evals' ':!.github' ':!README*.md' ':!CHANGELOG.md' ':!CONTRIBUTING.md' ':!SECURITY.md'; then
               echo "::warning::The kit changed since $tag but .claude-plugin/plugin.json still says $version. Plugin users get the change only after the version is raised (and a CHANGELOG entry added)."
             fi
             exit 0
