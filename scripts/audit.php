@@ -36,13 +36,18 @@ Options:
                        target PHP is not installed. docker:8.3 picks another version, docker:<image> any image.
                        The container has no network, sees the repo read-only and is removed afterwards.
   --exclude=a,b        Extra folders to skip (vendor, node_modules, .git, cache... are always skipped).
-  --skip=a,b           Steps to skip: libs, phpcompat, rector.
+  --skip=a,b           Steps to skip: libs, phpcompat, rector, logs.
   --load-classes       Also load every application class on --php (Composer autoload or plain files), in a
                        scratch copy. Slower; see scripts/load_classes.php --help.
   --memory=<size>      memory_limit for PHPCompatibility and Rector (default 2G); raise it for big repos.
   --offline            No network at all (otherwise public package names go to repo.packagist.org, and the
                        newest PHP version is asked from php.net).
   --sarif=<file>       Also write the findings as SARIF 2.1.0 (GitHub code scanning), outside the repo.
+  --logs=<file|dir>    Runtime error logs to read (repeatable), e.g. copied from staging after it ran on the
+                       target PHP. They show what static analysis cannot: a NULL from a database column passed
+                       to strtolower(), a dynamic property... Logs inside the repo (application/logs,
+                       storage/logs, var/log, logs) are always read; --skip=logs turns both off. Read-only,
+                       at most 50 MB in total, newest files first.
   --fail-on=<level>    For CI: exit 10 when there are findings at this level or above.
                        Levels, highest first: wajib (must fix) > deprecated > perilaku (behaviour change).
   --help               This text.
@@ -75,6 +80,12 @@ if (!is_dir($repo)) {
 }
 if ($out === null || $out === '1') {
     usageError('--out=<store> is required (a folder outside the repo, e.g. --out=~/php-audit-store).', 'scripts/audit.php');
+}
+$logs = optAll($argv, 'logs');
+foreach ($logs as $l) {
+    if (!file_exists($l)) {
+        usageError("log file or folder not found: $l (--logs)", 'scripts/audit.php');
+    }
 }
 $sarif = opt($argv, 'sarif');
 if ($sarif === '1') {
@@ -148,6 +159,9 @@ $steps = [
 if (!in_array('libs', $skip, true)) {
     $steps['libs'] = ['check_libs.php', [$repo, "--target=$target", "--cache=$out/.cache/packagist", ...($offline ? ['--offline'] : [])]];
 }
+if (!in_array('logs', $skip, true)) {
+    $steps['logs'] = ['scan_logs.php', [$repo, ...array_map(fn ($l) => '--logs=' . absPath($l), $logs)]];
+}
 if (opt($argv, 'load-classes') !== null) {
     $steps['runtime'] = ['load_classes.php', [$repo, "--php=$php", "--work=$out/.cache/load-classes", ...($offline ? ['--offline'] : []), ...$common]];
 }
@@ -182,6 +196,18 @@ foreach (array_values(array_diff(['phpcompat', 'rector'], $skip)) as $tool) {
     }
 }
 
+// A log entry the scanner also reported (same file, line and rule) is already covered; the others only the logs show.
+if (isset($report['logs']['entries'])) {
+    $seen = [];
+    foreach ($report['scan']['findings'] ?? [] as $f) {
+        $seen["{$f['file']}:{$f['line']}:{$f['rule']}"] = true;
+    }
+    foreach ($report['logs']['entries'] as &$e) {
+        $e['in_scan'] = $e['rule'] !== null && isset($seen["{$e['file']}:{$e['line']}:{$e['rule']}"]);
+    }
+    unset($e);
+    writeJson("$dir/logs.json", $report['logs']);
+}
 writeJson("$dir/report.json", $report);
 $carried = $previous !== null && history_carry_notes($entity, $previous['id'], $dir);
 history_add($entity, $name, 'repo', $id, ['generated_at' => $report['generated_at'], 'target' => $target, 'git' => $report['profile']['git'] ?? null]);
@@ -233,6 +259,10 @@ function countByLevel(array $report): array
         if (!empty($e['removed_in'])) {
             $counts['wajib']++;
         }
+    }
+    // Runtime logs: one per message and location (fatal errors stop the request)
+    foreach ($report['logs']['entries'] ?? [] as $e) {
+        $counts[['fatal' => 'wajib', 'deprecated' => 'deprecated', 'warning' => 'perilaku'][$e['level']] ?? 'perilaku']++;
     }
     $counts['wajib'] += count($report['runtime']['failed'] ?? []);
     $counts['deprecated'] += count($report['runtime']['deprecations'] ?? []);

@@ -1,0 +1,10 @@
+[23-Oct-2026 08:14:42 UTC] PHP Deprecated:  Creation of dynamic property Legacy::$cache is deprecated in /srv/app/src/Legacy.php on line 6
+[23-Oct-2026 08:14:42 UTC] PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /srv/app/src/Legacy.php on line 6
+[23-Oct-2026 08:14:42 UTC] PHP Warning:  Undefined variable $undefinedVar in /srv/app/src/Legacy.php on line 6
+[23-Oct-2026 08:14:43 UTC] PHP Notice:  Only variables should be passed by reference in /srv/app/src/Legacy.php on line 6
+[23-Oct-2026 08:14:44 UTC] PHP Fatal error:  Uncaught DivisionByZeroError: Division by zero in /srv/app/src/Legacy.php:6
+Stack trace:
+#0 /srv/app/src/Legacy.php(6): intdiv(1, 0)
+#1 {main}
+  thrown in /srv/app/src/Legacy.php on line 6
+23-Oct-2026 08:15:00 NOTICE: PHP message: PHP Deprecated:  utf8_encode(): Passing null to parameter #1 ($string) of type string is deprecated in /srv/app/src/Legacy.php on line 6

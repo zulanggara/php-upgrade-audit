@@ -1,0 +1,13 @@
+[2026-10-21 10:00:00] production.WARNING: strtolower(): Passing null to parameter #1 ($string) of type string is deprecated in /var/www/html/app/Http/Controllers/Report.php on line 8
+[2026-10-21 11:00:00] production.WARNING: strtolower(): Passing null to parameter #1 ($string) of type string is deprecated in /var/www/html/app/Http/Controllers/Report.php on line 8
+[2026-10-21 11:30:00] production.WARNING: Order 77 shipped late
+[2026-10-21 12:00:00] production.ERROR: Undefined array key "status" {"exception":"[object] (ErrorException(code: 0): Undefined array key \"status\" at /var/www/html/app/Http/Controllers/Report.php:8)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(255): handleError()
+"}
+[2026-10-21 12:30:00] production.ERROR: strtolower(): Argument #1 ($string) must be of type string, array given {"exception":"[object] (TypeError(code: 0): strtolower(): Argument #1 ($string) must be of type string, array given at /var/www/html/app/Http/Controllers/Report.php:8)
+[stacktrace]
+"}
+[2026-10-21 13:00:00] production.ERROR: No query results for model [App\Models\User]. {"exception":"[object] (Illuminate\\Database\\Eloquent\\ModelNotFoundException(code: 0): No query results for model [App\\Models\\User]. at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:621)
+"}
+[2026-10-21 14:00:00] local.WARNING: str_replace(): Passing null to parameter #3 ($subject) of type array|string is deprecated in /var/www/html/vendor/acme/lib/src/Text.php on line 30 [] []

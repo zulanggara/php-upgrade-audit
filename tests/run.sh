@@ -111,6 +111,32 @@ php "$DIR/scripts/scan_code.php" "$DIR/fixtures/null-args" > "$TMP/null.json"
 php "$DIR/tests/check_null_args.php" "$DIR/fixtures/null-args" "$TMP/null.json" || fail "P81-NULL-TO-INTERNAL does not match the // FIND markers"
 echo "null arguments: ok"
 
+# Runtime logs: CodeIgniter 3 and Laravel logs found in the repo, a PHP error_log given with --logs
+php "$DIR/scripts/scan_logs.php" "$DIR/fixtures/logs-app" --logs="$DIR/fixtures/logs-external/php_errors.log" > "$TMP/logs.json" || fail "scan_logs.php failed"
+php "$DIR/tests/check_logs.php" "$TMP/logs.json" || fail "scan_logs.php: groups, totals or formats are wrong"
+php "$DIR/scripts/scan_logs.php" "$DIR/fixtures/logs-app" --no-auto > "$TMP/logs-none.json"
+grep -q '"sources": \[\]' "$TMP/logs-none.json" || fail "--no-auto still read the logs in the repo"
+php "$DIR/scripts/scan_logs.php" "$DIR/fixtures/logs-app" --max-mb=0.0005 > "$TMP/logs-cut.json"
+php -r '$s = json_decode(file_get_contents($argv[1]), true)["sources"]; $read = array_sum(array_column($s, "read"));
+exit($read <= 525 && $s[0]["truncated"] && ($s[1]["skipped"] ?? "") === "byte limit reached" ? 0 : 1);' "$TMP/logs-cut.json" || fail "--max-mb is not respected"
+# Secrets, e-mail addresses and the log's own paths never reach the output (secret assembled here, not in the repo)
+TOKEN="ghp_$(printf 'k%.0s' $(seq 1 36))"; MAIL="jane.doe@example.org"
+printf '[23-Oct-2026 09:00:00 UTC] PHP Warning:  Undefined array key "%s" in /home/someone/site/src/Legacy.php on line 6\n[23-Oct-2026 09:00:01 UTC] PHP Deprecated:  json_decode(): Passing null to parameter #1 ($json) of type string is deprecated, token=%s in /home/someone/site/src/Legacy.php on line 6\n' "$MAIL" "$TOKEN" > "$TMP/secret.log"
+php "$DIR/scripts/scan_logs.php" "$DIR/fixtures/logs-app" --no-auto --logs="$TMP/secret.log" > "$TMP/logs-secret.json"
+php "$DIR/tests/check_logs.php" "$TMP/logs-secret.json" "$TOKEN" "$MAIL" "/home/someone" "$TMP" || fail "a secret, address or path from a log reached logs.json"
+# Through audit.php: logs.json in the scan, counted, nothing written into the repo, --skip=logs and a wrong path
+touch "$TMP/before-logs"
+php "$DIR/scripts/audit.php" "$DIR/fixtures/logs-app" --out="$TMP/st-logs" --offline --skip=libs,phpcompat,rector --logs="$DIR/fixtures/logs-external/php_errors.log" > /dev/null 2> "$TMP/logs-audit.err" || fail "audit --logs failed"
+ls "$TMP"/st-logs/logs-app/scans/*/logs.json > /dev/null 2>&1 || fail "audit --logs wrote no logs.json"
+grep -q 'findings: wajib 3, deprecated 8, perilaku 4' "$TMP/logs-audit.err" || fail "log entries are not counted: $(grep findings "$TMP/logs-audit.err")"
+[ -z "$(find "$DIR/fixtures/logs-app" -newer "$TMP/before-logs")" ] || fail "audit --logs wrote into the audited repo"
+grep -q '"in_scan": true' "$TMP"/st-logs/logs-app/scans/*/logs.json || fail "log entries are not matched with the scanner findings"
+php "$DIR/scripts/audit.php" "$DIR/fixtures/logs-app" --out="$TMP/st-nologs" --offline --skip=libs,phpcompat,rector,logs > /dev/null 2>&1
+ls "$TMP"/st-nologs/logs-app/scans/*/logs.json > /dev/null 2>&1 && fail "--skip=logs still read the logs"
+code=0; php "$DIR/scripts/audit.php" "$DIR/fixtures/logs-app" --out="$TMP/st-nologs" --logs="$TMP/missing.log" > /dev/null 2>&1 || code=$?
+[ $code = 1 ] || fail "a missing --logs path was not refused"
+echo "runtime logs: ok"
+
 # Lint must report the curly-offset parse error
 php "$DIR/scripts/lint.php" "$DIR/fixtures/legacy-app" > "$TMP/lint.json"
 grep -q '"Parse error"' "$TMP/lint.json" || fail "lint did not report the parse error"
@@ -295,6 +321,13 @@ if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
       "--expect-text=argument 1 of strtoupper() can be null via \$role (line 9)" "--expect-text=Confidence: low" > /dev/null || fail "null-argument detail not shown (en)"
     node "$DIR/tests/page_check.js" "$TMP/null-id.html" "--expect-text=argumen 1 json_decode() bisa null: \$this->input->post('payload') (CodeIgniter input)" \
       "--expect-text=lewat \$role (baris 9)" "--expect-text=Keyakinan: rendah" > /dev/null || fail "null-argument detail not shown (id)"
+    # The runtime log section, and the hint when no log was read
+    php "$DIR/scripts/render.php" --store="$TMP/st-logs" --out="$TMP/logs-en.html" --lang=en --offline 2> /dev/null
+    php "$DIR/scripts/render.php" --store="$TMP/st-logs" --out="$TMP/logs-id.html" --lang=id --offline 2> /dev/null
+    node "$DIR/tests/page_check.js" "$TMP/logs-en.html" "--expect-text=Runtime logs: 3 file(s), 3 fatal, 7 deprecated, 4 warning (18 occurrence(s))" \
+      "--expect-text=only in the logs" "--expect-text=also found by the scanner" "--expect-text=outside the repo" > /dev/null || fail "runtime log section not shown (en)"
+    node "$DIR/tests/page_check.js" "$TMP/logs-id.html" "--expect-text=Log runtime: 3 file, 3 fatal, 7 deprecated, 4 warning (18 kejadian)" "--expect-text=hanya di log" > /dev/null || fail "runtime log section not shown (id)"
+    node "$DIR/tests/page_check.js" "$TMP/null-en.html" "--expect-text=Runtime logs: none read" > /dev/null || fail "no hint when no log was read"
   else
     echo "pages: skipped (could not install jsdom; run 'npm install' in tests/)"
   fi

@@ -30,6 +30,18 @@ function opt(array $argv, string $name, ?string $default = null): ?string
     return $default;
 }
 
+/** Every value of a repeatable option: --name=a --name=b => ['a', 'b']. */
+function optAll(array $argv, string $name): array
+{
+    $out = [];
+    foreach ($argv as $a) {
+        if (str_starts_with($a, "--$name=") && strlen($a) > strlen($name) + 3) {
+            $out[] = substr($a, strlen($name) + 3);
+        }
+    }
+    return $out;
+}
+
 /**
  * Exit codes shared by every script:
  *   0 ok, 1 wrong usage, 2 environment problem (e.g. analysis tools not installed),
@@ -246,7 +258,8 @@ function listPhpFiles(string $root, array $excludes): array
                     }
                     return true;
                 }
-                return in_array(strtolower($f->getExtension()), PHP_EXTS, true);
+                // CodeIgniter writes its logs as log-YYYY-MM-DD.php: logs, not code (scan_logs.php reads them)
+                return in_array(strtolower($f->getExtension()), PHP_EXTS, true) && !preg_match('/^log-\d{4}-\d{2}-\d{2}\.php$/', $f->getFilename());
             }
         )
     );

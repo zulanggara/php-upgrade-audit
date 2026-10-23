@@ -242,6 +242,14 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
           superglobal: `${arg} can be null: ${d.source} is read without isset()`,
           variable: `${arg} can be null via ${d.via} (line ${d.via_line}): ${from}` })[d.kind] || `${arg} can be null: ${from}`;
       },
+      logSum: (n, f, d, w, o) => `Runtime logs: ${n} file(s), ${f} fatal, ${d} deprecated, ${w} warning (${o} occurrence(s))`,
+      logNone: 'Runtime logs: none read',
+      logHint: (dirs) => `No error log was found in the repo (${dirs}). Logs from a run on the target PHP (staging, tests) show what static analysis cannot, such as a NULL from a database column passed to a built-in: run audit.php again with --logs=<file or folder>.`,
+      logLead: 'Grouped per message and per file:line. "Only in the logs" means the scanner did not report that line: usually a value from the database or another runtime source.',
+      logLevel: { fatal: 'Fatal', deprecated: 'Deprecated', warning: 'Warning' }, logMsg: 'Message', logLast: 'Last seen',
+      logOutside: 'outside the repo', logInScan: 'also found by the scanner', logOnly: 'only in the logs', logClean: 'No deprecation, warning or fatal error in the logs read.',
+      logSources: 'Log files read', logFile: 'File', logFormat: 'Format', logMatched: 'Kept / lines', logAuto: 'found in the repo',
+      logTrunc: (r, b) => `last ${r} of ${b} MB read`, logSkipped: (p) => `Not read (compressed): ${p}`,
       level: 'Level', since: 'Since', issue: 'Issue and fix', count: 'Count', confidence: 'Confidence', files: 'file(s)', guardedBy: 'Guarded by', showMore: (n) => `Show ${n} more`, yes: 'yes', avail: 'available',
       guard: { mati: 'not run on the target version', jalan: 'runs on the target version', '?': 'condition could not be evaluated' },
       rtSum: (p, l, u, f, x, d) => `Runtime proof on PHP ${p} (class loading): ${l} of ${u} loaded, ${f} failed, ${x} unresolved, ${d} deprecation(s)`,
@@ -297,6 +305,14 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
           superglobal: `${arg} bisa null: ${d.source} dibaca tanpa isset()`,
           variable: `${arg} bisa null lewat ${d.via} (baris ${d.via_line}): ${from}` })[d.kind] || `${arg} bisa null: ${from}`;
       },
+      logSum: (n, f, d, w, o) => `Log runtime: ${n} file, ${f} fatal, ${d} deprecated, ${w} warning (${o} kejadian)`,
+      logNone: 'Log runtime: tidak ada yang dibaca',
+      logHint: (dirs) => `Tidak ada log error di repo (${dirs}). Log dari aplikasi yang sudah berjalan di PHP target (staging, tes) menunjukkan hal yang tidak terlihat secara statis, misalnya NULL dari kolom database yang dikirim ke fungsi bawaan: jalankan audit.php lagi dengan --logs=<file atau folder>.`,
+      logLead: 'Dikelompokkan per pesan dan per file:baris. "Hanya di log" berarti scanner tidak melaporkan baris itu: biasanya nilai dari database atau sumber runtime lain.',
+      logLevel: { fatal: 'Fatal', deprecated: 'Deprecated', warning: 'Warning' }, logMsg: 'Pesan', logLast: 'Terakhir terlihat',
+      logOutside: 'di luar repo', logInScan: 'juga ditemukan scanner', logOnly: 'hanya di log', logClean: 'Tidak ada deprecation, warning, atau fatal error di log yang dibaca.',
+      logSources: 'File log yang dibaca', logFile: 'File', logFormat: 'Format', logMatched: 'Diambil / baris', logAuto: 'ditemukan di repo',
+      logTrunc: (r, b) => `${r} MB terakhir dari ${b} MB dibaca`, logSkipped: (p) => `Tidak dibaca (terkompresi): ${p}`,
       level: 'Tingkat', since: 'Sejak', issue: 'Masalah dan perbaikan', count: 'Jumlah', confidence: 'Keyakinan', files: 'file', guardedBy: 'Dijaga', showMore: (n) => `Tampilkan ${n} lagi`, yes: 'ya', avail: 'tersedia',
       guard: { mati: 'tidak dijalankan di versi target', jalan: 'dijalankan di versi target', '?': 'kondisi tidak bisa dievaluasi' },
       rtSum: (p, l, u, f, x, d) => `Bukti runtime di PHP ${p} (memuat class): ${l} dari ${u} termuat, ${f} gagal, ${x} belum terselesaikan, ${d} deprecation`,
@@ -357,9 +373,10 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
     const removedExt = ((r.libs || {}).extensions || []).filter((e) => e.removed_in).length;
     const loadFail = ((r.runtime || {}).failed || []).length;
     const advisories = ((r.libs || {}).packages || []).reduce((n, p) => n + (p.advisories || []).length, 0);
+    const logT = (r.logs || {}).totals || {};
     let status = ['s-ok', T.autoStatus.ok];
-    if (counts.wajib || lintErr || libs['tidak-didukung'] || removedExt || loadFail || advisories) status = ['s-wajib', T.autoStatus.must];
-    else if (counts.deprecated || counts.perilaku || libs['perlu-upgrade'] || libs['cek-manual'] || lintDep) status = ['s-deprecated', T.autoStatus.dep];
+    if (counts.wajib || lintErr || libs['tidak-didukung'] || removedExt || loadFail || advisories || logT.fatal) status = ['s-wajib', T.autoStatus.must];
+    else if (counts.deprecated || counts.perilaku || libs['perlu-upgrade'] || libs['cek-manual'] || lintDep || logT.deprecated || logT.warning) status = ['s-deprecated', T.autoStatus.dep];
     if (r.status && r.status.label) status = [LEVEL_CLASS[r.status.level] || 's-info', r.status.label];
     return { counts, guarded, libs, lintErr, lintDep, advisories, status };
   }
@@ -628,7 +645,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
         </div>
         <div class="table-scroll"><table data-role="findings"></table></div>
       </section>
-      ${lintHtml(r.lint)}${runtimeHtml(r.runtime)}${phpcompatHtml(r.phpcompat)}${rectorHtml(r.rector)}`;
+      ${lintHtml(r.lint)}${runtimeHtml(r.runtime)}${logsHtml(r.logs, (r.scan || {}).rules || {})}${phpcompatHtml(r.phpcompat)}${rectorHtml(r.rector)}`;
   }
 
   function libRootHtml(libs) {
@@ -707,6 +724,29 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
     return `<details class="block"${errs.length ? ' open' : ''}><summary>${esc(T.lintSum(lint.php, errs.length, deps.length, num(lint.files_linted)))}</summary><div>
       ${errs.length ? `<h3>${esc(T.parseErr)}</h3>${list(errs)}` : `<p class="empty">${esc(T.noLintErr)}</p>`}
       ${deps.length ? `<h3>${esc(T.compileDep)}</h3>${list(deps.slice(0, 500))}` : ''}</div></details>`;
+  }
+  function logsHtml(lg, rules) {
+    if (!lg) return '';
+    if (lg.error) return `<details class="block"><summary>${esc(T.logSum(0, 0, 0, 0, 0))}</summary><div><p class="sub">${esc(lg.error)}</p></div></details>`;
+    const src = lg.sources || [], ent = lg.entries || [], t = lg.totals || {};
+    if (!src.length) return `<details class="block"><summary>${esc(T.logNone)}</summary><div><p class="sub">${esc(T.logHint((lg.auto_dirs || []).join(', ')))}</p></div></details>`;
+    const lvl = { fatal: 'wajib', deprecated: 'deprecated', warning: 'perilaku' };
+    const rows = ent.slice(0, 300).map((e) => {
+      const rule = e.rule && rules[e.rule] ? rules[e.rule] : null;
+      return `<tr><td>${pill(lvl[e.level] || 'info', T.logLevel[e.level] || e.level)}</td>
+        <td><code>${esc(e.message)}</code>${e.rule ? `<div class="sub">${esc(e.rule)}${rule ? ` · ${esc(rule.title)}` : ''}</div>` : ''}</td>
+        <td><span class="mono">${esc(e.file)}:${e.line}</span>${e.in_repo ? '' : ` <span class="tag">${esc(T.logOutside)}</span>`}
+          ${e.in_repo ? `<div class="sub">${esc(e.in_scan ? T.logInScan : T.logOnly)}</div>` : ''}</td>
+        <td class="num">${num(e.count)}</td><td class="sub">${esc((e.last_seen || '').replace('T', ' ').replace('Z', ' UTC'))}</td></tr>`;
+    }).join('');
+    const srcRows = src.map((x) => `<tr><td class="mono">${esc(x.path)}${x.auto ? ` <span class="tag">${esc(T.logAuto)}</span>` : ''}</td><td>${esc((x.formats || []).join(', ') || '-')}</td>
+      <td class="num">${num(x.matched)} / ${num(x.lines)}</td><td class="sub">${esc(x.skipped || (x.truncated ? T.logTrunc(Math.round(x.read / 1048576 * 10) / 10, Math.round(x.bytes / 1048576 * 10) / 10) : ''))}</td></tr>`).join('');
+    return `<details class="block"${t.fatal || t.deprecated ? ' open' : ''}><summary>${esc(T.logSum(src.length, t.fatal || 0, t.deprecated || 0, t.warning || 0, t.occurrences || 0))}</summary><div>
+      <p class="sub">${esc(T.logLead)}</p>
+      ${ent.length ? `<div class="table-scroll"><table><thead><tr><th>${esc(T.level)}</th><th>${esc(T.logMsg)}</th><th>${esc(T.rtWhere)}</th><th class="num">${esc(T.count)}</th><th>${esc(T.logLast)}</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="empty">${esc(T.logClean)}</p>`}
+      ${ent.length > 300 ? `<p class="sub">${esc(T.showMore(ent.length - 300))}</p>` : ''}
+      <h3>${esc(T.logSources)}</h3><div class="table-scroll"><table><thead><tr><th>${esc(T.logFile)}</th><th>${esc(T.logFormat)}</th><th class="num">${esc(T.logMatched)}</th><th></th></tr></thead><tbody>${srcRows}</tbody></table></div>
+      ${(lg.skipped || []).length ? `<p class="sub">${esc(T.logSkipped(lg.skipped.map((x) => x.path).join(', ')))}</p>` : ''}</div></details>`;
   }
   function runtimeHtml(rt) {
     if (!rt || rt.error) return rt && rt.error ? `<details class="block"><summary>${esc(T.rtSum('?', 0, 0, 0, 0, 0))}</summary><div><p class="sub">${esc(rt.error)}</p></div></details>` : '';
