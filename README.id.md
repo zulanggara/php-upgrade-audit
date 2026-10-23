@@ -6,8 +6,8 @@
 
 Perangkat audit **read-only** untuk memindahkan kode PHP ke versi PHP 8 yang lebih baru. Asalnya bisa PHP 7.x
 atau 8.x yang lebih lama, dengan Laravel, Symfony, WordPress, CodeIgniter, atau tanpa framework. Target
-default adalah versi terbaru yang dicakup aturan (**8.5.12**). Target lain juga bisa, misalnya
-`--target=8.3.30`.
+default adalah **rilis PHP terbaru** dari versi minor terbaru yang dicakup aturan (ditanyakan ke php.net:
+saat ini 8.5.12, dan 8.5.12 bila offline). Target lain juga bisa, misalnya `--target=8.3.30`.
 
 Dirancang untuk dijalankan oleh AI coding agent (skill atau plugin Claude Code, atau agent lain lewat
 `AGENTS.md`), tapi setiap langkahnya berupa script PHP biasa yang bisa Anda jalankan sendiri atau di CI.
@@ -59,7 +59,7 @@ Untuk audit upgrade PHP, ikuti ~/tools/php-upgrade-audit/AGENTS.md (read-only; j
 Ketik perintahnya, dengan repo dan opsi sebagai argumen:
 
 ```text
-/php-upgrade-audit ~/src/toko-saya                                # target terbaru (8.5.12), bahasa Anda
+/php-upgrade-audit ~/src/toko-saya                                # rilis PHP terbaru (8.5.x), bahasa Anda
 /php-upgrade-audit ~/src/toko-saya ~/src/admin --target=8.3.30 --lang=id
 /php-upgrade-audit ~/src/lama --target=8.2 --store=~/audit --name=lama
 ```
@@ -71,10 +71,12 @@ Permintaan biasa juga bisa, Claude akan memilih skill-nya sendiri:
 
 ### Meminta versi PHP tertentu
 
-Targetnya adalah versi yang Anda sebut: `8.1`, `8.3.30`, `8.4.27`, `8.5.12`, atau `latest`. Perubahan yang
+Targetnya adalah versi yang Anda sebut: `8.3.30`, `8.4.27`, `8.5.12`, versi minor saja seperti `8.3` (rilis
+terbarunya), atau `latest` (default: rilis terbaru dari minor terbaru yang dicakup aturan). Perubahan yang
 baru muncul setelah target tidak dilaporkan (audit untuk 8.3 tidak menampilkan deprecation 8.4/8.5), dan
 Rector serta PHPCompatibility memeriksa terhadap versi minor target. Untuk bukti runtime (`php -l`, memuat
-class) agent butuh versi PHP itu terpasang, dan akan memberi tahu kalau belum ada (lihat
+class) agent butuh versi PHP itu terpasang, atau Docker (`--php=docker`), dan akan memberi tahu kalau
+keduanya tidak ada (lihat
 [Memilih target](#memilih-versi-php-target)).
 
 ## Instalasi
@@ -126,7 +128,8 @@ TOOL=~/tools/php-upgrade-audit
 STORE=~/php-audit-store
 
 # 1. scan (jalankan lagi nanti: versi baru ditambahkan, tidak ada yang ditimpa)
-php $TOOL/scripts/audit.php /path/ke/repo --out=$STORE --name=aplikasi-saya --target=8.5.12 --load-classes
+php $TOOL/scripts/audit.php /path/ke/repo --out=$STORE --name=aplikasi-saya --load-classes   # PHP terbaru; atau --target=8.3.30
+#    PHP target belum terpasang tapi ada Docker: tambahkan --php=docker
 
 # 2. opsional: ganti atau merge framework
 php $TOOL/scripts/compare_framework.php --old=/path/lama/system --new=/path/baru/system --app=/path/ke/repo \
@@ -153,6 +156,19 @@ buka di browser.
 php scripts/audit.php . --out="$RUNNER_TEMP/php-audit" --target=8.4 --skip=rector --fail-on=wajib
 ```
 
+Temuan sebagai anotasi di pull request (GitHub code scanning, SARIF 2.1.0):
+
+```yaml
+- run: php scripts/audit.php . --out="$RUNNER_TEMP/php-audit" --skip=rector --sarif="$RUNNER_TEMP/php-upgrade.sarif"
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: ${{ runner.temp }}/php-upgrade.sarif
+    category: php-upgrade-audit
+```
+
+Temuan wajib menjadi error, deprecated menjadi warning, perilaku menjadi note; temuan library menunjuk baris
+package-nya di `composer.lock`. `php scripts/sarif.php <report.json>` mengonversi scan lama mana pun.
+
 Exit code setiap script: `0` ok, `1` salah pemakaian, `2` masalah environment (mis. tool belum terpasang),
 `4` `render.php` menolak menulis laporan yang masih memuat rahasia, `10` ada temuan di tingkat `--fail-on` atau di atasnya (`wajib` > `deprecated` > `perilaku`). Akhir output
 merangkum jumlah temuan per tingkat.
@@ -163,11 +179,15 @@ merangkum jumlah temuan per tingkat.
   `testVersion` PHPCompatibility, dan constraint Composer.
 - PHP yang **menjalankan** `php -l` dan pemuatan class menentukan **apa yang dibuktikan**. Pakai versi target
   sebagai `php`, atau berikan `--php=/path/ke/php8.3`. `audit.php` memberi peringatan kalau keduanya berbeda.
-- Belum punya PHP target? Pakai Homebrew `php@8.3`, paket distribusi (`php8.3-cli`), atau Docker:
-  `docker run --rm -v "$PWD:$PWD" -w "$PWD" php:8.3-cli php ...` (tool analisa lalu butuh Composer di image,
-  mis. disalin dari `composer:2`).
-- Target yang lebih baru dari katalog aturan (mis. 8.6 sebelum aturan diperbarui) diterima dengan peringatan:
-  perubahan di versi itu tidak diperiksa scanner.
+- Belum punya PHP target? Dengan Docker, `--php=docker` menjalankan `php -l`, scanner, dan pemuatan class di
+  image resmi `php:<target>-cli` (`--php=docker:8.3` untuk versi lain, `--php=docker:<image>` untuk image
+  sendiri). Satu container per audit, tanpa jaringan, repo di-mount read-only, dihapus di akhir; Composer tetap
+  jalan di mesin Anda dengan versi PHP container sebagai platform. Selain itu: Homebrew `php@8.3` atau paket
+  distribusi (`php8.3-cli`).
+- `latest` (default) mengikuti php.net: saat PHP 8.5.13 rilis, targetnya 8.5.13. Bila sudah ada minor yang lebih
+  baru dari cakupan aturan (mis. 8.6.0), target tetap di minor terbaru yang dicakup dan audit memberitahukannya;
+  perbarui kit ini, atau berikan `--target=8.6.0` (diterima dengan peringatan: perubahan di 8.6 tidak diperiksa
+  scanner).
 
 ## Yang diperiksa
 
@@ -178,6 +198,7 @@ merangkum jumlah temuan per tingkat.
 | Parse error dan deprecation saat kompilasi | `php -l` ke semua file dengan PHP target |
 | Class yang tidak bisa dimuat lagi (`--load-classes`) | Setiap class aplikasi dimuat di PHP target pada salinan sementara: konflik signature (fatal sejak 8.0), class induk yang hilang, deprecation saat class di-link. Lewat autoload Composer, atau file biasa untuk proyek tanpa Composer |
 | Library Composer | Constraint `php` setiap package di `composer.lock` vs target, package abandoned, versi terbaru di major yang sama, versi terbaru yang mendukung target (Packagist) |
+| Security advisory | Kerentanan yang sudah diketahui (CVE/GHSA) di versi terpasang setiap package publik, dari API security advisories Packagist (data yang sama dengan `composer audit`), beserta versi terendah yang memperbaikinya dan mendukung target. Masing-masing dihitung wajib |
 | Ekstensi PHP | Ekstensi yang dibutuhkan package tapi sudah dihapus dari core di versi target (mcrypt, imap, dll.) |
 | Pembanding | PHPCompatibility (phpcs) dan Rector `--dry-run` (menunjukkan apa yang bisa diperbaiki otomatis) |
 | Ganti atau merge framework (opsional) | Patch lokal vs rilis resmi, API yang hilang/berubah, konflik override dengan aplikasi (aturan signature PHP), pemanggilan API yang hilang, key config. Adapter framework menambah pengecekan khusus ([`scripts/adapters/`](scripts/adapters/), CodeIgniter 3 sudah tersedia) |
@@ -188,10 +209,13 @@ Kode yang diaudit tidak pernah diubah, dan `composer` maupun Rector tidak pernah
 
 Setiap kesimpulan menautkan sumber yang bisa dicek sendiri oleh pembaca:
 
-- **Temuan scanner** menautkan halaman migrasi php.net, juga RFC atau `UPGRADING` php-src bila relevan
-  (misalnya perubahan cost bcrypt di 8.4).
-- **Library** menautkan halaman Packagist, repo sumber, dan halaman rilis versi yang disarankan. Perubahan yang
-  merusak di package populer disertai sumbernya sendiri, dibaca pada tag tertentu: misalnya firebase/php-jwt 7.0
+- **Temuan scanner**: setiap aturan (~80) menautkan halaman migrasi php.net, entri `UPGRADING` php-src dari
+  rilis yang membuat perubahan itu (dikutip persis, di cabang rilisnya), dan RFC yang dirujuk entri tersebut
+  ([`scripts/rules_evidence.php`](scripts/rules_evidence.php)). Kutipannya muncul saat kursor diarahkan.
+- **Library** menautkan halaman Packagist, repo sumber, dan halaman rilis versi yang disarankan; security
+  advisory menautkan GitHub advisory dan catatan CVE-nya. Perubahan yang merusak di package populer (php-jwt 7,
+  Guzzle 7, Monolog 2/3, Doctrine DBAL 3, PHPUnit 10, Swift Mailer, phpseclib 3, Laravel 9/10/11) disertai
+  sumbernya sendiri, dibaca pada tag tertentu: misalnya firebase/php-jwt 7.0
   menolak kunci HMAC yang lebih pendek dari algoritmanya (HS256 butuh 32 byte), lengkap dengan changelog, PR,
   baris kode sumbernya, dan hasil uji di PHP 8.5.12 (v6.11.1 menerima kunci 12 byte, v7.2.1 melempar
   `Provided key is too short`). Lihat [`scripts/library_notes.php`](scripts/library_notes.php).
@@ -228,15 +252,22 @@ Skill menjalankan `scripts/update.sh` setiap kali audit dimulai, jadi salinan ya
 Manual: `bash scripts/update.sh --force` (cek sekarang), `--check` (hanya melaporkan). Matikan dengan
 `PHP_UPGRADE_AUDIT_NO_UPDATE=1` atau `--offline`.
 
+Setiap versi diberi tag (`v1.2.0`) beserta changelog-nya di halaman
+[Releases](https://github.com/zulanggara/php-upgrade-audit/releases); footer laporan menampilkan versi dan
+commit yang menghasilkannya.
+
 ## Privasi dan jaringan
 
 - **Rahasia disensor** di setiap output tool dan sekali lagi pada seluruh laporan: token seperti `ghp_…` dan
   `glpat-…`, key AWS/Google/Stripe/Slack, JWT, private key, `user:password@` di URL, `password => '…'`,
   `$secret = '…'`, `DB_PASSWORD=…`, dan literal acak yang panjang. Semuanya tampil sebagai `«REDACTED»`.
 - Path absolut lokal (folder home, folder sementara, store, folder tool ini) dibuang dari laporan.
-- Akses jaringan saat audit: nama package publik ke `repo.packagist.org` (package privat dilewati), dan dengan
-  `--load-classes`, `composer install` biasa untuk package yang terkunci di salinan sementara (dari sumber yang
-  ditulis `composer.lock`, dengan kredensial Composer Anda sendiri). `--offline` mematikan keduanya.
+- Akses jaringan saat audit: nama package publik ke `repo.packagist.org` dan `packagist.org` (metadata dan
+  security advisory; package privat dilewati), satu request ke `php.net` untuk rilis PHP terbaru bila target
+  tidak disebut persis, image resmi `php` dari Docker Hub dengan `--php=docker`, dan dengan `--load-classes`,
+  `composer install` biasa untuk package yang terkunci di salinan sementara (dari sumber yang ditulis
+  `composer.lock`, dengan kredensial Composer Anda sendiri). `--offline` mematikan semuanya kecuali pull image
+  Docker.
 - `scripts/update.sh` mengecek versi baru kit ini ke GitHub paling sering sekali sehari (satu `git fetch`, atau
   satu request untuk `plugin.json` yang terpublikasi). `PHP_UPGRADE_AUDIT_NO_UPDATE=1` mematikannya.
 - HTML memuat font IBM Plex dari Google Fonts. Render dengan `--offline` untuk halaman tanpa request eksternal sama sekali.

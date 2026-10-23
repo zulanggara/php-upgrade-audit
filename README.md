@@ -5,8 +5,9 @@
 **English** · [Bahasa Indonesia](README.id.md)
 
 A read-only audit kit for moving a PHP codebase to a newer PHP 8 version: PHP 7.x or older 8.x, with Laravel,
-Symfony, WordPress, CodeIgniter or no framework. The default target is the newest version the rules cover
-(**8.5.12**); any other target works too, for example `--target=8.3.30`.
+Symfony, WordPress, CodeIgniter or no framework. The default target is the **newest PHP release** of the
+newest minor the rules cover (asked from php.net: 8.5.12 today, and 8.5.12 when offline); any other target
+works too, for example `--target=8.3.30`.
 
 It is built to be driven by an AI coding agent (a Claude Code skill or plugin, or any agent through
 `AGENTS.md`), but every step is a plain PHP script you can run yourself or in CI.
@@ -57,7 +58,7 @@ For PHP upgrade audits follow ~/tools/php-upgrade-audit/AGENTS.md (read-only; ne
 Type the command, with the repo(s) and options as arguments:
 
 ```text
-/php-upgrade-audit ~/src/my-shop                                  # latest target (8.5.12), your language
+/php-upgrade-audit ~/src/my-shop                                  # latest PHP release (8.5.x), your language
 /php-upgrade-audit ~/src/my-shop ~/src/admin --target=8.3.30 --lang=id
 /php-upgrade-audit ~/src/legacy --target=8.2 --store=~/audits --name=legacy
 ```
@@ -69,10 +70,11 @@ Plain requests work too, Claude picks the skill by itself:
 
 ### Asking for a specific PHP version
 
-The target is whatever you name: `8.1`, `8.3.30`, `8.4.27`, `8.5.12`, or `latest`. Changes introduced after
+The target is whatever you name: `8.3.30`, `8.4.27`, `8.5.12`, a bare minor such as `8.3` (its newest
+release), or `latest` (the default: the newest release of the newest minor the rules cover). Changes introduced after
 the target are not reported (an audit for 8.3 shows no 8.4/8.5 deprecations), and Rector and
 PHPCompatibility check against the target's minor version. For the runtime proof (`php -l`, class loading)
-the agent needs that PHP version installed; it tells you when it is missing (see
+the agent needs that PHP version installed, or Docker (`--php=docker`); it tells you when neither is there (see
 [Choosing the target](#choosing-the-target-php)).
 
 ## Install
@@ -124,7 +126,8 @@ TOOL=~/tools/php-upgrade-audit
 STORE=~/php-audit-store
 
 # 1. scan (run again later: a new version is added, nothing is overwritten)
-php $TOOL/scripts/audit.php /path/to/repo --out=$STORE --name=my-app --target=8.5.12 --load-classes
+php $TOOL/scripts/audit.php /path/to/repo --out=$STORE --name=my-app --load-classes     # latest PHP; or --target=8.3.30
+#    no target PHP installed but Docker is: add --php=docker
 
 # 2. optional: framework switch or merge
 php $TOOL/scripts/compare_framework.php --old=/path/old/system --new=/path/new/system --app=/path/to/repo \
@@ -151,6 +154,19 @@ a browser.
 php scripts/audit.php . --out="$RUNNER_TEMP/php-audit" --target=8.4 --skip=rector --fail-on=wajib
 ```
 
+Findings as annotations on the pull request (GitHub code scanning, SARIF 2.1.0):
+
+```yaml
+- run: php scripts/audit.php . --out="$RUNNER_TEMP/php-audit" --skip=rector --sarif="$RUNNER_TEMP/php-upgrade.sarif"
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: ${{ runner.temp }}/php-upgrade.sarif
+    category: php-upgrade-audit
+```
+
+Must-fix findings become errors, deprecations warnings, behaviour changes notes; library results point at
+the package's line in `composer.lock`. `php scripts/sarif.php <report.json>` converts any earlier scan.
+
 Exit codes of every script: `0` ok, `1` wrong usage, `2` environment problem (e.g. tools not installed), `4` `render.php`
 refused to write a report that still contains a secret, `10` findings at the `--fail-on` level or above (`wajib` > `deprecated` > `perilaku`). The end of the output
 summarises the findings per level.
@@ -161,11 +177,15 @@ summarises the findings per level.
   `testVersion`, Composer constraints.
 - The PHP that **runs** `php -l` and class loading decides **what is proven**. Use the target version as `php`,
   or pass `--php=/path/to/php8.3`. `audit.php` warns when they differ.
-- No target PHP installed? Homebrew `php@8.3`, your distribution's packages (`php8.3-cli`), or Docker:
-  `docker run --rm -v "$PWD:$PWD" -w "$PWD" php:8.3-cli php ...` (the analysis tools then need Composer in
-  the image, e.g. `composer:2` copied in).
-- A target newer than the rule catalogue (e.g. 8.6 before the rules are updated) is accepted with a warning:
-  changes made in that version are not checked by the scanner.
+- No target PHP installed? With Docker, `--php=docker` runs `php -l`, the scanner and class loading in the
+  official `php:<target>-cli` image (`--php=docker:8.3` for another version, `--php=docker:<image>` for your
+  own). One container per audit, without network, the repo mounted read-only, removed at the end; Composer
+  stays on your machine with the container's PHP version as platform. Otherwise Homebrew `php@8.3` or your
+  distribution's packages (`php8.3-cli`).
+- `latest` (the default) follows php.net: when PHP 8.5.13 is out, the target is 8.5.13. When a newer minor
+  than the rules cover is out (say 8.6.0), the target stays on the newest covered minor and the audit says
+  so; update the kit, or pass `--target=8.6.0` (accepted with a warning: changes made in 8.6 are not checked
+  by the scanner).
 
 ## What it checks
 
@@ -176,6 +196,7 @@ summarises the findings per level.
 | Parse errors and compile-time deprecations | `php -l` on every file with the target PHP |
 | Classes that no longer load (`--load-classes`) | Every class of the app loaded on the target PHP in a scratch copy: signature conflicts (fatal since 8.0), missing parents, deprecations while linking. Composer autoload, or plain files for projects without Composer |
 | Composer libraries | `php` constraint of every package in `composer.lock` vs the target, abandoned packages, latest version in the same major, latest version supporting the target (Packagist) |
+| Security advisories | Known vulnerabilities (CVE/GHSA) in the installed version of every public package, from the Packagist security advisories API (the data `composer audit` uses), with the lowest version that fixes them and supports the target. Each counts as must-fix |
 | PHP extensions | Extensions required by packages that were removed from core by the target (mcrypt, imap, …) |
 | Cross-checks | PHPCompatibility (phpcs) and Rector `--dry-run` (shows what can be fixed automatically) |
 | Framework switch or merge (optional) | Local patches vs the official release, removed/changed API, override conflicts with the app (PHP signature rules), calls to removed API, config keys. Framework adapters add specific checks ([`scripts/adapters/`](scripts/adapters/), CodeIgniter 3 bundled) |
@@ -186,10 +207,13 @@ It never modifies the audited code and never runs `composer` or Rector in it.
 
 Every conclusion links to where a reader can check it:
 
-- **Scanner findings** link their php.net migration page, and the RFC or php-src `UPGRADING` where it matters
-  (for example the bcrypt cost change in 8.4).
-- **Libraries** link their Packagist page, source repository and the release page of the suggested version.
-  Known breaking changes of popular packages come with their own source, read at a tag: for example
+- **Scanner findings**: every one of the ~80 rules links its php.net migration page, the php-src `UPGRADING`
+  entry of the release that made the change (quoted exactly, on the release branch) and the RFCs that entry
+  cites ([`scripts/rules_evidence.php`](scripts/rules_evidence.php)). The quote shows on hover.
+- **Libraries** link their Packagist page, source repository and the release page of the suggested version;
+  security advisories link the GitHub advisory and the CVE record. Known breaking changes of popular packages
+  (php-jwt 7, Guzzle 7, Monolog 2/3, Doctrine DBAL 3, PHPUnit 10, Swift Mailer, phpseclib 3, Laravel 9/10/11)
+  come with their own source, read at a tag: for example
   firebase/php-jwt 7.0 rejects HMAC keys shorter than the algorithm (HS256 needs 32 bytes), with the changelog,
   the PR, the source line, and a run on PHP 8.5.12 (v6.11.1 accepts a 12-byte key, v7.2.1 throws
   `Provided key is too short`). See [`scripts/library_notes.php`](scripts/library_notes.php).
@@ -226,15 +250,22 @@ The skill runs `scripts/update.sh` at the start of every audit, so an installed 
 By hand: `bash scripts/update.sh --force` (check now), `--check` (report only). Turn it off with
 `PHP_UPGRADE_AUDIT_NO_UPDATE=1` or `--offline`.
 
+Every version is tagged (`v1.2.0`) with its changelog on the
+[Releases](https://github.com/zulanggara/php-upgrade-audit/releases) page; the report footer shows which
+version and commit produced it.
+
 ## Privacy and network
 
 - **Secrets are redacted** in every tool output and again on the whole report (tokens such as `ghp_…`,
   `glpat-…`, AWS/Google/Stripe/Slack keys, JWTs, private keys, `user:password@` in URLs, `password => '…'`,
   `$secret = '…'`, `DB_PASSWORD=…`, long random literals). They show up as `«REDACTED»`.
 - Local absolute paths (home folders, temp folders, the store, this tool's folder) are removed from the report.
-- Network during an audit: public package names to `repo.packagist.org` (private packages are skipped) and,
-  with `--load-classes`, a normal `composer install` of the locked packages in a scratch copy (from wherever
-  `composer.lock` points, with your own Composer credentials). `--offline` disables both.
+- Network during an audit: public package names to `repo.packagist.org` and `packagist.org` (metadata and
+  security advisories; private packages are skipped), one request to `php.net` for the newest PHP release
+  when no exact target is given, the official `php` image from Docker Hub with `--php=docker`, and, with
+  `--load-classes`, a normal `composer install` of the locked packages in a scratch copy (from wherever
+  `composer.lock` points, with your own Composer credentials). `--offline` disables all of them except the
+  Docker image pull.
 - `scripts/update.sh` checks GitHub for a new version of this kit at most once a day (a `git fetch`, or one
   request for the published `plugin.json`). `PHP_UPGRADE_AUDIT_NO_UPDATE=1` turns it off.
 - The HTML loads IBM Plex from Google Fonts. Render with `--offline` for a page with no external request at all.

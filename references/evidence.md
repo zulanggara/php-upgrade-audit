@@ -61,16 +61,37 @@ Each entry was read at the linked source and, where it can be run, run on the PH
   throws `DomainException: Provided key is too short`. A 32-byte key works on both.
 - Library note in `scripts/library_notes.php` (shown for installed versions below 7.0).
 
-### guzzlehttp/guzzle 7.0, monolog/monolog 2.0 and 3.0
+### Other library notes
 
-- Sources: [Guzzle UPGRADING.md 6.0 to 7.0](https://github.com/guzzle/guzzle/blob/7.0.0/UPGRADING.md),
-  [Monolog UPGRADE.md 2.0.0](https://github.com/Seldaek/monolog/blob/2.0.0/UPGRADE.md),
-  [Monolog UPGRADE.md 3.0.0](https://github.com/Seldaek/monolog/blob/3.0.0/UPGRADE.md).
-- Library notes in `scripts/library_notes.php`.
+Read at the linked tag or release branch; each has a library note in `scripts/library_notes.php`.
+
+- Guzzle 7: [UPGRADING.md 6.0 to 7.0](https://github.com/guzzle/guzzle/blob/7.0.0/UPGRADING.md).
+- Monolog 2 and 3: [UPGRADE.md 2.0.0](https://github.com/Seldaek/monolog/blob/2.0.0/UPGRADE.md),
+  [UPGRADE.md 3.0.0](https://github.com/Seldaek/monolog/blob/3.0.0/UPGRADE.md).
+- Doctrine DBAL 3: [UPGRADE.md at 3.0.0](https://github.com/doctrine/dbal/blob/3.0.0/UPGRADE.md).
+- PHPUnit 10: [ChangeLog-10.0.md](https://github.com/sebastianbergmann/phpunit/blob/10.0.0/ChangeLog-10.0.md)
+  ("PHP 7.3, PHP 7.4, and PHP 8.0 are no longer supported").
+- Swift Mailer: [README at v6.3.0](https://github.com/swiftmailer/swiftmailer/blob/v6.3.0/README.md) ("Swiftmailer
+  will stop being maintained at the end of November 2021"); replaced by symfony/mailer.
+- phpseclib 3: [README at 3.0.0](https://github.com/phpseclib/phpseclib/blob/3.0.0/README.md) (namespace
+  `\phpseclib3`).
+- Laravel 9, 10, 11: upgrade guides on the release branches of laravel/docs:
+  [9.x](https://github.com/laravel/docs/blob/9.x/upgrade.md), [10.x](https://github.com/laravel/docs/blob/10.x/upgrade.md),
+  [11.x](https://github.com/laravel/docs/blob/11.x/upgrade.md).
+
+## Sources the tools add by themselves
+
+- **Every scanner rule**: `scripts/rules_evidence.php` gives the php-src `UPGRADING` entry of the release that
+  made the change, quoted exactly as on the release branch (`PHP-7.0` to `PHP-8.5`), and the RFCs that entry
+  cites. `scan.json` carries them per rule; reuse them in notes.
+- **Security advisories**: `libs.json` lists per package the advisories that affect the installed version
+  (GitHub Advisory Database and FriendsOfPHP through the Packagist API), with the GHSA link, the CVE record and
+  `fixed_in`. Cite them with `kind: advisory` / `cve`.
+- `tests/check_links.php` (weekly in CI) checks that every link answers and every quote is still there.
 
 ## Adding an entry
 
 1. Read the change at its source; note the tag and a quote.
 2. Run it on the versions before and after when it can be run (Docker `php:X.Y-cli` is fine).
-3. Add it here, and as a scanner rule (`evidence` field, see `references/rules.md`) or a library note
-   (`scripts/library_notes.php`) when it can be detected. Add a test.
+3. Add it here, and to `scripts/rules_evidence.php` (scanner rule) or `scripts/library_notes.php` (library
+   note, with a `quote`) when it can be detected. Add a test, and run `php tests/check_links.php`.

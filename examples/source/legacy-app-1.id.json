@@ -259,6 +259,49 @@
           "quote": "This fix will cause keys with a size below the minimally allowed size to break."
         }
       ]
+    },
+    {
+      "sev": "wajib",
+      "title": "Kerentanan yang sudah diketahui di library terkunci",
+      "body": "Saat scan, security advisories Packagist mencatat 38 advisory untuk versi yang terpasang (lihat tabel advisory di bawah library). Yang paling serius: php-jwt 5.0.0 punya kerentanan critical key/algorithm type confusion (diperbaiki di 6.0.0; ambil 7.x yang juga mewajibkan ukuran kunci), guzzle 6.3.3 punya beberapa advisory high (diperbaiki di 7.15.2), dan phpoffice/phpexcel 1.8.1 punya advisory XXE dan XSS tanpa versi perbaikan: ganti dengan phpoffice/phpspreadsheet. Upgrade ini beririsan dengan pekerjaan PHP 8.5, jadi kerjakan sekaligus.",
+      "files": [
+        "composer.lock"
+      ],
+      "evidence": [
+        {
+          "kind": "advisory",
+          "title": "CRITICAL GHSA-8xf4-w7qw-pjjw: php-jwt key/algorithm type confusion (< 6.0.0)",
+          "url": "https://github.com/advisories/GHSA-8xf4-w7qw-pjjw"
+        },
+        {
+          "kind": "cve",
+          "title": "CVE-2021-46743",
+          "url": "https://www.cve.org/CVERecord?id=CVE-2021-46743"
+        },
+        {
+          "kind": "advisory",
+          "title": "HIGH GHSA-v5mv-p594-2x33: Guzzle noncanonical host can bypass host-based checks (< 7.15.2)",
+          "url": "https://github.com/advisories/GHSA-v5mv-p594-2x33"
+        },
+        {
+          "kind": "advisory",
+          "title": "HIGH GHSA-7cc9-j4mv-vcjp: XXE in the XLSX reader (phpexcel <= 1.8.2)",
+          "url": "https://github.com/advisories/GHSA-7cc9-j4mv-vcjp"
+        }
+      ],
+      "code": [
+        {
+          "where": "composer.json",
+          "before": "\"guzzlehttp/guzzle\": \"^6.3\",\n\"firebase/php-jwt\": \"^5.0\",",
+          "after": "\"guzzlehttp/guzzle\": \"^7.15.2\",\n\"firebase/php-jwt\": \"^7.0\",",
+          "proof": {
+            "php": "8.5.12",
+            "run": "composer audit --locked --format=summary (on a copy of composer.json/composer.lock)",
+            "output": "Found 38 security vulnerability advisories affecting 5 packages."
+          },
+          "note": "Guzzle 7 dan php-jwt 7 punya perubahan yang merusak: lihat catatan library."
+        }
+      ]
     }
   ]
 }
