@@ -171,7 +171,19 @@ function gitInfo(string $repo): ?array
         return null;
     }
     $git = fn (string $args) => trim((string) shell_exec('git -C ' . escapeshellarg($repo) . " $args 2>/dev/null"));
+    // The scan reads the working tree, so changes that are not committed are part of what was scanned.
+    $porcelain = array_filter(explode("\n", (string) shell_exec('git -C ' . escapeshellarg($repo) . ' status --porcelain 2>/dev/null')), 'strlen');
+    $staged = $unstaged = $untracked = 0;
+    foreach ($porcelain as $line) {
+        if (str_starts_with($line, '??')) {
+            $untracked++;
+            continue;
+        }
+        $staged += $line[0] !== ' ' ? 1 : 0;
+        $unstaged += ($line[1] ?? ' ') !== ' ' ? 1 : 0;
+    }
     return [
+        'uncommitted' => ['staged' => $staged, 'unstaged' => $unstaged, 'untracked' => $untracked],
         'branch' => $git('branch --show-current'),
         'commit' => $git('log -1 --format=%h'),
         'date' => $git('log -1 --format=%cs'),
