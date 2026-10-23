@@ -118,6 +118,7 @@ $data = [
     'lang' => $lang,
     'generated_at' => date('c'),
     'url' => opt($argv, 'url'),
+    'kit' => kitInfo(),
     'overview' => $overview,
     'entities' => $entities,
 ];

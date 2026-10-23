@@ -810,7 +810,8 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
         <p class="sub"><b>${esc(T.removedL)}:</b> ${(files.removed || []).map((f) => `<span class="tag mono">${esc(f)}</span>`).join('') || '-'}</p></div></details>`;
   }
 
-  document.getElementById('footer').innerHTML = `<span>${esc(T.footer(DATA.redacted || 0))}</span><span class="sub">${esc(T.footerData)}</span>`;
+  const kit = DATA.kit && DATA.kit.version ? ` · php-upgrade-audit ${DATA.kit.version}${DATA.kit.commit ? ' (' + DATA.kit.commit + ')' : ''}` : '';
+  document.getElementById('footer').innerHTML = `<span>${esc(T.footer(DATA.redacted || 0))}</span><span class="sub">${esc(T.footerData + kit)}</span>`;
   show();
 })();
 </script>

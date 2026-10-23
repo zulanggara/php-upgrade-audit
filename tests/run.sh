@@ -372,4 +372,36 @@ set -e
 grep -q 'Warning: target is PHP 7.4' "$TMP/warn.txt" || fail "no warning when the PHP running the audit is not the target"
 [ -d "$DIR/fixtures/legacy-app/out" ] && fail "audit created a folder inside the repo"
 echo "first run: ok"
+
+# Self-update: a git clone fast-forwards to what its origin published; a clone with local changes is never touched
+if command -v git >/dev/null 2>&1 && git -C "$DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  U="$TMP/upd"; mkdir -p "$U/src"
+  G=(git -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false)
+  (cd "$DIR" && git ls-files -z -co --exclude-standard | tar --null -T - -cf -) | tar -xf - -C "$U/src"
+  "${G[@]}" -C "$U/src" init -q && "${G[@]}" -C "$U/src" checkout -q -b main && "${G[@]}" -C "$U/src" add -A && "${G[@]}" -C "$U/src" commit -qm base
+  git clone -q --bare "$U/src" "$U/remote.git" && git clone -q "$U/remote.git" "$U/kit"
+  publish() { sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"$1\"/" "$U/src/.claude-plugin/plugin.json" && rm "$U/src/.claude-plugin/plugin.json.bak" &&
+    "${G[@]}" -C "$U/src" commit -qam "release $1" && "${G[@]}" -C "$U/src" push -q "$U/remote.git" main; }
+    kitver() { php -r 'echo json_decode(file_get_contents($argv[1]), true)["version"];' "$U/$1/.claude-plugin/plugin.json"; }
+  publish 1.9.0
+  bash "$U/kit/scripts/update.sh" --check | tail -1 | grep -qx "update: available" || fail "update --check did not see the new version"
+  [ "$(kitver kit)" != "1.9.0" ] || fail "update --check changed the clone"
+  bash "$U/kit/scripts/update.sh" --force > "$U/out1.txt"
+  tail -1 "$U/out1.txt" | grep -qx "update: updated" || fail "clone was not updated: $(cat "$U/out1.txt")"
+  [ "$(kitver kit)" = "1.9.0" ] || fail "clone did not reach the published version"
+  bash "$U/kit/scripts/update.sh" > "$U/out2.txt"
+  grep -q "checked in the last 24 h" "$U/out2.txt" || fail "second check the same day went to the network"
+  publish 2.0.0
+  echo "local edit" >> "$U/kit/SKILL.md"
+  bash "$U/kit/scripts/update.sh" --force | tail -1 | grep -qx "update: available" || fail "a clone with local changes was not reported as 'available'"
+  [ "$(kitver kit)" = "1.9.0" ] && grep -q "local edit" "$U/kit/SKILL.md" || fail "a clone with local changes was modified"
+  PHP_UPGRADE_AUDIT_NO_UPDATE=1 bash "$U/kit/scripts/update.sh" --force | tail -1 | grep -q "update: skipped" || fail "opt-out ignored"
+  # not a git clone (plugin cache, download): compare with the published plugin.json
+  mkdir -p "$U/copy" && (cd "$U/kit" && tar --exclude=.git -cf - .) | tar -xf - -C "$U/copy"
+  echo '{"version": "9.9.9"}' > "$U/published.json"
+  PHP_UPGRADE_AUDIT_UPDATE_URL="file://$U/published.json" bash "$U/copy/scripts/update.sh" --force | tail -1 | grep -qx "update: available" || fail "copy did not see the published version"
+  echo "{\"version\": \"$(kitver copy)\"}" > "$U/published.json"
+  PHP_UPGRADE_AUDIT_UPDATE_URL="file://$U/published.json" bash "$U/copy/scripts/update.sh" --force | tail -1 | grep -qx "update: up-to-date" || fail "copy at the published version not up to date"
+  echo "self-update: ok"
+fi
 echo "all tests passed"

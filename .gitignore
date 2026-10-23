@@ -16,3 +16,7 @@ report.html
 # test dependencies
 /tests/node_modules/
 /tests/package-lock.json
+
+# update check stamp and setup log (scripts/update.sh)
+/tools/.update-check
+/tools/.setup.log

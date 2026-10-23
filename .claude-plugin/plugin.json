@@ -1,7 +1,7 @@
 {
   "name": "php-upgrade-audit",
   "displayName": "PHP Upgrade Audit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Read-only audit of a PHP codebase before a PHP 8.x upgrade (default target 8.5.12, any 8.x target): removed/deprecated/behaviour-changing code, php -l and class-loading proof, Composer libraries, framework comparison, and one HTML report with scan history.",
   "author": {
     "name": "Zul Anggara",

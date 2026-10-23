@@ -50,6 +50,15 @@ function usageError(string $message, string $script): never
     exit(EXIT_USAGE);
 }
 
+/** Version of this kit (from .claude-plugin/plugin.json) and, in a git clone, its commit. */
+function kitInfo(): array
+{
+    $root = dirname(__DIR__);
+    $json = json_decode((string) @file_get_contents("$root/.claude-plugin/plugin.json"), true);
+    $commit = is_dir("$root/.git") ? trim((string) shell_exec('git -C ' . escapeshellarg($root) . ' rev-parse --short HEAD 2>/dev/null')) : '';
+    return ['version' => is_array($json) ? ($json['version'] ?? null) : null, 'commit' => $commit === '' ? null : $commit];
+}
+
 /** Folder of the analysis tools (Rector, phpcs, composer/semver) or null when setup.sh was not run. */
 function toolsVendor(): ?string
 {

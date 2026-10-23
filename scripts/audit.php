@@ -132,7 +132,7 @@ if (opt($argv, 'load-classes') !== null) {
     $steps['runtime'] = ['load_classes.php', [$repo, "--php=$php", "--work=$out/.cache/load-classes", ...($offline ? ['--offline'] : []), ...$common]];
 }
 
-$report = ['schema' => 2, 'name' => $name, 'scan_id' => $id, 'target' => $target, 'generated_at' => date('c'), 'php_runtime' => $phpVersion];
+$report = ['schema' => 2, 'name' => $name, 'scan_id' => $id, 'target' => $target, 'generated_at' => date('c'), 'php_runtime' => $phpVersion, 'kit' => kitInfo()];
 $report['timings'] = [];
 foreach ($steps as $key => [$script, $args]) {
     fwrite(STDERR, "[$name] $key...\n");
