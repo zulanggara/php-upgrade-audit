@@ -758,7 +758,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
             (hits.length > limit ? `<li><button type="button" class="more" data-more="${esc(id)}">${esc(T.showMore(hits.length - limit))}</button></li>` : '') + `</ul></td></tr>`;
           return `<tr class="rule-row" data-rule="${esc(id)}" tabindex="0" aria-expanded="${expanded}"><td><span class="caret">▸</span> ${pill(m.sev)}</td>
             <td class="mono">${esc(m.ver)}</td>
-            <td><div>${esc(m.title)}</div><div class="sub">${esc(m.fix)} ${safeUrl(m.ref) ? `<a href="${esc(m.ref)}" target="_blank" rel="noopener noreferrer">php.net</a>` : ''}${(m.evidence || []).filter((x) => safeUrl(x.url)).map((x) => ` · <a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc((T.evKind || {})[x.kind] || x.title || x.kind)}</a>`).join('')} · <span class="mono">${esc(id)}</span></div></td>
+            <td><div>${esc(m.title)}</div><div class="sub">${esc(m.fix)} ${safeUrl(m.ref) ? `<a href="${esc(m.ref)}" target="_blank" rel="noopener noreferrer">php.net</a>` : ''}${(m.evidence || []).filter((x) => safeUrl(x.url)).map((x) => ` · <a href="${esc(x.url)}" title="${esc(x.quote ? `${x.title}: "${x.quote}"` : (x.title || ''))}" target="_blank" rel="noopener noreferrer">${esc((T.evKind || {})[x.kind] || x.title || x.kind)}</a>`).join('')} · <span class="mono">${esc(id)}</span></div></td>
             <td class="num">${hits.length}<div class="sub">${files} ${esc(T.files)}</div></td><td>${esc(m.conf)}</td><td>${esc(auto)}</td></tr>${detail}`;
         }).join('') + '</tbody>';
     }

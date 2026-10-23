@@ -27,8 +27,8 @@
  * Optional for func/method: only_if_mentioned => 'Name' or ['a', 'b'] (the rule only applies in files that mention
  *   one of them, for generic names such as ->contains() or is_resource()).
  * Optional: rector => name of the Rector rule that fixes it (shown in the report).
- * Optional: evidence => [['kind' => 'rfc'|'php-src'|..., 'title' => ..., 'url' => 'https://...'], ...]: sources besides ref
- *   that a reader can check (references/evidence.md); shown next to the php.net link.
+ * Sources besides ref live in rules_evidence.php (keyed by id; every rule has an entry). Optional here:
+ *   evidence => [['kind' => ..., 'title' => ..., 'url' => 'https://...'], ...] for more (references/evidence.md).
  */
 
 const MIG = 'https://www.php.net/manual/en/';
@@ -185,11 +185,7 @@ return [
         'argc' => ['<', 3], 'arg_token' => ['PASSWORD_DEFAULT', 'PASSWORD_BCRYPT'],
         'title' => 'Cost default bcrypt naik dari 10 ke 12: password_hash() lebih lambat, hash lama dianggap perlu rehash',
         'fix' => 'Hash baru memakai cost 12, sekitar 4x lebih lama (terukur ~60 ms jadi ~240 ms per hash), dan password_needs_rehash() mengembalikan true untuk hash cost 10, jadi hash lama ditulis ulang saat login. Ukur beban endpoint login/registrasi; tulis [\'cost\' => 10] secara eksplisit bila perilaku lama harus dipertahankan.',
-        'ref' => MIG . 'migration84.other-changes.php',
-        'evidence' => [
-            ['kind' => 'rfc', 'title' => 'RFC: Increasing the default BCrypt cost', 'url' => 'https://wiki.php.net/rfc/bcrypt_cost_2023'],
-            ['kind' => 'php-src', 'title' => 'PHP 8.4 UPGRADING: PASSWORD_BCRYPT cost 10 → 12', 'url' => 'https://github.com/php/php-src/blob/PHP-8.4/UPGRADING'],
-        ]],
+        'ref' => MIG . 'migration84.other-changes.php'],
     ['id' => 'P84-USER-ERROR', 'sev' => 'deprecated', 'ver' => '8.4', 'conf' => 'tinggi', 'kind' => 'func', 'names' => ['trigger_error', 'user_error'], 'arg_token' => ['E_USER_ERROR'],
         'title' => 'trigger_error() dengan E_USER_ERROR deprecated', 'fix' => 'Lempar exception atau panggil exit().', 'ref' => MIG . 'migration84.deprecated.php'],
     ['id' => 'P84-DEPR-CONST', 'sev' => 'deprecated', 'ver' => '8.4', 'conf' => 'tinggi', 'kind' => 'const',

@@ -34,6 +34,19 @@ if ($missing || $extra) { fwrite(STDERR, "missing: " . implode(", ", $missing) .
 ' "$DIR/scripts/rules.php" "$DIR/scripts/rules_en.php" || fail "rules_en.php does not match rules.php"
 echo "translations: ok"
 
+# Every rule has checkable sources: a php-src UPGRADING quote at a release branch, http(s) links only
+php -r '
+$ids = array_column(require $argv[1], "id");
+$ev = require $argv[2];
+$bad = array_merge(array_diff($ids, array_keys($ev)), array_map(fn ($i) => "$i (unknown rule)", array_diff(array_keys($ev), $ids)));
+foreach ($ev as $id => $list) {
+    $src = array_filter($list, fn ($e) => $e["kind"] === "php-src" && preg_match("#^https://github\.com/php/php-src/blob/PHP-[78]\.\d/UPGRADING$#", $e["url"]) && trim($e["quote"] ?? "") !== "");
+    if ($src === []) $bad[] = "$id (no php-src quote)";
+    foreach ($list as $e) if (!preg_match("#^https://#", $e["url"]) || trim($e["title"] ?? "") === "") $bad[] = "$id (bad entry)";
+}
+if ($bad) { fwrite(STDERR, implode(", ", $bad) . "\n"); exit(1); }' "$DIR/scripts/rules.php" "$DIR/scripts/rules_evidence.php" || fail "rules_evidence.php does not cover every rule"
+echo "rule evidence: ok"
+
 # Scanner with an older target: rules introduced after the target must not be reported
 php "$DIR/scripts/scan_code.php" "$DIR/fixtures/legacy-app" --target=8.3.30 > "$TMP/scan83.json"
 grep -q '"rule": "P80-' "$TMP/scan83.json" || fail "target 8.3: PHP 8.0 rules no longer fire"

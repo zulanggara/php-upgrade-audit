@@ -49,8 +49,10 @@ foreach ($files as $path) {
 }
 
 $meta = [];
+$evidence = require __DIR__ . '/rules_evidence.php';
 foreach ($rules as $r) {
-    $meta[$r['id']] = array_intersect_key($r, array_flip(['sev', 'ver', 'conf', 'title', 'fix', 'ref', 'rector', 'evidence']));
+    $meta[$r['id']] = array_intersect_key($r, array_flip(['sev', 'ver', 'conf', 'title', 'fix', 'ref', 'rector']));
+    $meta[$r['id']]['evidence'] = array_values(array_merge($evidence[$r['id']] ?? [], $r['evidence'] ?? []));
 }
 printJson([
     'tool' => 'scan_code',
