@@ -12,6 +12,8 @@ require_once __DIR__ . '/history.php';
 
 const NOTE_SEV = ['wajib', 'deprecated', 'perilaku', 'info'];
 const STATUS_LEVELS = ['wajib', 'deprecated', 'perilaku', 'ok'];
+/** Kinds of evidence a note can cite (see references/evidence.md). */
+const EVIDENCE_KINDS = ['php.net', 'rfc', 'php-src', 'changelog', 'release', 'upgrade', 'source', 'issue', 'cve', 'advisory', 'docs', 'run'];
 
 /**
  * Problems in one notes.json (kind "notes") or overview.json (kind "overview").
@@ -102,7 +104,7 @@ function validate_document(mixed $doc, string $kind, array $repos = []): array
                 $err("$w.$k", "missing or empty$title");
             }
         }
-        foreach (array_diff(array_keys($n), ['sev', 'title', 'body', 'files', 'code']) as $k) {
+        foreach (array_diff(array_keys($n), ['sev', 'title', 'body', 'files', 'code', 'evidence']) as $k) {
             $warn("$w.$k", 'unknown key (typo?)');
         }
         if (isset($n['files']) && (!is_array($n['files']) || array_filter($n['files'], fn ($f) => !is_string($f)) !== [])) {
@@ -128,6 +130,47 @@ function validate_document(mixed $doc, string $kind, array $repos = []): array
             }
             if (is_string($c['before'] ?? null) && ($c['before'] === ($c['after'] ?? null))) {
                 $warn("$w.code[$j]", 'before and after are identical');
+            }
+            foreach (array_diff(array_keys($c), ['where', 'before', 'after', 'note', 'proof']) as $k) {
+                $warn("$w.code[$j].$k", 'unknown key (typo?)');
+            }
+            // proof: what the agent ran on the target PHP to check the suggested code.
+            if (isset($c['proof'])) {
+                $pr = $c['proof'];
+                if (!is_array($pr) || !is_string($pr['php'] ?? null) || !preg_match('/^\d+\.\d+(\.\d+)?$/', $pr['php'])) {
+                    $err("$w.code[$j].proof", 'must be {"php": "8.5.12", "run": "command or snippet", "output": "what it printed"}');
+                } elseif (trim((string) ($pr['output'] ?? '')) === '') {
+                    $warn("$w.code[$j].proof.output", 'empty: paste what the run printed, so readers can compare');
+                }
+            }
+        }
+        // evidence: where a reader can check the claim (php.net, RFC, changelog, release notes, source).
+        $evidence = $n['evidence'] ?? [];
+        if (!is_array($evidence) || !array_is_list($evidence)) {
+            $err("$w.evidence", 'must be a list of {"title", "url", "kind", "quote"}');
+            $evidence = [];
+        }
+        if ($evidence === [] && in_array($n['sev'] ?? null, ['wajib', 'deprecated', 'perilaku'], true)) {
+            $warn("$w.evidence", "no evidence$title; link the source a reader can check (php.net, RFC, changelog, release notes, source code)");
+        }
+        foreach ($evidence as $j => $e) {
+            if (!is_array($e)) {
+                $err("$w.evidence[$j]", 'must be an object {"title", "url", "kind", "quote"}');
+                continue;
+            }
+            if (!is_string($e['url'] ?? null) || !preg_match('#^https?://[^\s]+$#i', $e['url'])) {
+                $err("$w.evidence[$j].url", 'missing or not an http(s) URL (other schemes are never linked in the report)');
+            } elseif (str_starts_with(strtolower($e['url']), 'http://')) {
+                $warn("$w.evidence[$j].url", 'use https:// where the source offers it');
+            }
+            if (trim((string) ($e['title'] ?? '')) === '') {
+                $warn("$w.evidence[$j].title", 'missing: say what the source is, e.g. "PHP 8.4 UPGRADING: bcrypt cost"');
+            }
+            if (isset($e['kind']) && !in_array($e['kind'], EVIDENCE_KINDS, true)) {
+                $warn("$w.evidence[$j].kind", 'unknown kind; known: ' . implode(', ', EVIDENCE_KINDS));
+            }
+            foreach (array_diff(array_keys($e), ['title', 'url', 'kind', 'quote']) as $k) {
+                $warn("$w.evidence[$j].$k", 'unknown key (typo?)');
             }
         }
     }

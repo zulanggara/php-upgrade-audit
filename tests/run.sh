@@ -246,6 +246,38 @@ done
 grep -q "$GHTOKEN" "$TMP/bad-out.json" && fail "validator output contains the secret"
 echo "validate notes: ok"
 
+# Evidence: links a reader can check, and the proof that suggested code ran on the target PHP
+EV_URL="https://github.com/php/php-src/blob/PHP-8.4/UPGRADING"
+cat > "$TMP/ev-good.json" <<JSON
+{"summary":"x","notes":[{"sev":"perilaku","title":"bcrypt cost","body":"b",
+ "code":[{"before":"password_hash(\$p, PASSWORD_DEFAULT)","after":"password_hash(\$p, PASSWORD_DEFAULT, ['cost' => 12])",
+   "proof":{"php":"8.5.12","run":"php check.php","output":"\$2y\$12\$"}}],
+ "evidence":[{"title":"PHP 8.4 UPGRADING","url":"$EV_URL","kind":"php-src","quote":"increased from '10' to '12'"}]}]}
+JSON
+php "$DIR/scripts/validate_notes.php" "$TMP/ev-good.json" > "$TMP/ev-good.txt" || fail "valid evidence rejected: $(cat "$TMP/ev-good.txt")"
+grep -q 'warning' "$TMP/ev-good.txt" && fail "valid evidence gave warnings: $(cat "$TMP/ev-good.txt")"
+cat > "$TMP/ev-bad.json" <<'JSON'
+{"summary":"x","notes":[{"sev":"wajib","title":"no evidence","body":"b","code":[{"before":"a","after":"b"}]},
+ {"sev":"info","title":"bad link","body":"b","evidence":[{"title":"x","url":"javascript:alert(1)"}],
+  "code":[{"before":"a","after":"b","proof":{"php":"latest"}}]}]}
+JSON
+set +e
+php "$DIR/scripts/validate_notes.php" "$TMP/ev-bad.json" --json > "$TMP/ev-bad.out"; code=$?
+set -e
+[ "$code" = 10 ] || fail "javascript: evidence url accepted"
+for w in 'notes\[0\].evidence' 'notes\[1\].evidence\[0\].url' 'notes\[1\].code\[0\].proof'; do
+  grep -q "\"where\": \"$w\"" "$TMP/ev-bad.out" || fail "validator missed $w"
+done
+if command -v node >/dev/null 2>&1 && [ -d "$DIR/tests/node_modules/jsdom" ]; then
+  EVSTORE="$TMP/ev-store"
+  php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$EVSTORE" --name=ev --skip=rector,phpcompat,libs --offline > /dev/null 2>&1
+  php -r '$g = json_decode(file_get_contents($argv[1]), true); $b = json_decode(file_get_contents($argv[2]), true);
+    $g["notes"][] = $b["notes"][1]; file_put_contents($argv[3], json_encode($g));' "$TMP/ev-good.json" "$TMP/ev-bad.json" "$(ls -d "$EVSTORE"/ev/scans/*)/notes.json"
+  php "$DIR/scripts/render.php" --store="$EVSTORE" --out="$TMP/ev.html" --offline 2> /dev/null
+  node "$DIR/tests/page_check.js" "$TMP/ev.html" --expect-link="$EV_URL" > /dev/null || fail "evidence link missing or an unsafe link was rendered"
+fi
+echo "evidence: ok"
+
 # Framework comparison: deliberate conflicts are found, and --store adds a version per run
 F="$DIR/fixtures/framework"
 CMP=(--old="$F/old" --new="$F/new" --app="$F/app" --official="$F/official" --new-config="$F/new-config" --app-config="$F/app/config")

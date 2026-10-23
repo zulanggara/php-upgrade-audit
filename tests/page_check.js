@@ -1,9 +1,12 @@
-// Opens every page of a rendered report in jsdom and fails on a script error or an empty page.
-// Usage: node page_check.js <report.html>
+// Opens every page of a rendered report in jsdom and fails on a script error, an empty page, or a link whose
+// scheme is not http(s) (notes are written from audited code: a javascript: link must never be rendered).
+// Usage: node page_check.js <report.html> [--expect-link=<url>]...   (each url must be linked on some page)
 const { JSDOM, VirtualConsole } = require('jsdom');
 const fs = require('fs');
 
-const file = process.argv[2];
+const file = process.argv.slice(2).find((a) => !a.startsWith('--'));
+const expected = process.argv.slice(2).filter((a) => a.startsWith('--expect-link=')).map((a) => a.slice(14));
+const seen = new Set();
 if (!file) { console.error('Usage: node page_check.js <report.html>'); process.exit(2); }
 const html = '<!doctype html><html><head></head><body>' + fs.readFileSync(file, 'utf8') + '</body></html>';
 
@@ -35,6 +38,17 @@ for (const h of [...new Set(hashes)]) {
     failed++;
     console.error(`FAIL #${h}: ${errors[0] || 'page is empty (' + text + ' chars)'}`);
   }
+  for (const a of dom.window.document.querySelectorAll('a[href]')) {
+    const href = a.getAttribute('href');
+    seen.add(href);
+    if (!/^(https?:\/\/|#)/i.test(href)) {
+      failed++;
+      console.error(`FAIL #${h}: unsafe link href="${href.slice(0, 60)}"`);
+    }
+  }
+}
+for (const u of expected) {
+  if (!seen.has(u)) { failed++; console.error(`FAIL: expected link not found: ${u}`); }
 }
 const total = new Set(hashes).size;
 console.log(failed ? `pages: ${failed} of ${total} failed` : `pages: ok (${total} pages opened)`);

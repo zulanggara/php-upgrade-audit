@@ -143,6 +143,13 @@ ol.steps li::marker { color: var(--accent); font-weight: 600; font-variant-numer
 .codecol { display: grid; gap: 4px; min-width: 0; align-content: start; }
 .codelabel { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 .codelabel.before { color: var(--del); } .codelabel.after { color: var(--add); }
+.evidence { display: grid; gap: 4px; margin-top: 2px; min-width: 0; }
+.evidence ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+.evidence li { overflow-wrap: anywhere; font-size: 13.5px; }
+.evidence q { display: block; color: var(--muted); font-size: 12.5px; margin-top: 1px; }
+details.proof { font-size: 12.5px; }
+details.proof summary { cursor: pointer; color: var(--add); }
+details.proof pre { margin: 4px 0 0; }
 pre.code { margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 1.55; background: var(--sunken); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
@@ -236,7 +243,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       lintSum: (p, e, d, f) => `Proof from PHP ${p} (php -l): ${e} error(s), ${d} deprecation(s) in ${f} files`, lintFail: 'Lint failed to run.', noLintErr: 'No parse or fatal errors.', parseErr: 'Parse / fatal errors', compileDep: 'Compile-time deprecations',
       pcSum: (v, n, k) => `PHPCompatibility (testVersion ${v}): ${n} message(s), ${k} kind(s)`, pcFail: 'PHPCompatibility: failed to run', sniff: 'Sniff', type: 'Type', example: 'Example', noMsg: 'No messages.',
       rcSum: (s, n) => `Rector ${s} (dry-run): ${n} file(s) can be changed automatically`, rcFail: 'Rector: failed to run', rcNote: 'This set also contains optional modernisation, e.g. array() to []. Not every change is required for compatibility.', rcRule: 'Rector rule', noChange: 'No changes.',
-      current: 'Current', suggested: 'Suggested',
+      current: 'Current', evidence: 'Evidence', evKind: { 'php.net': 'php.net', rfc: 'RFC', 'php-src': 'php-src', changelog: 'Changelog', release: 'Release', upgrade: 'Upgrade guide', source: 'Source code', issue: 'Issue / PR', cve: 'CVE', advisory: 'Advisory', docs: 'Docs', run: 'Run' }, unsafeLink: 'link removed: not an http(s) address', proofOn: (p, r) => `Verified on PHP ${p}${r ? ': ' + r : ''}`, evRule: 'Sources', suggested: 'Suggested',
       cmpLead: (o, of, n, nf, a) => `<span class="mono">${o}</span> (${of} files) → <span class="mono">${n}</span> (${nf} files), tested against <span class="mono">${a}</span>.`,
       overrideConflicts: 'Override conflicts in the application', apiUsage: 'Uses of removed or changed API', localPatched: 'Locally patched framework files', filesChanged: (c, a, r) => `Files changed · ${a} added · ${r} removed`,
       cmpTable: (t, o, n) => `PHP ${t} findings: ${o} vs ${n}`, cmpTableLead: (t) => `Counts exclude code proven not to run on ${t}.`, parseErrRow: 'Parse errors (php -l)', compileDepRow: 'Compile-time deprecations', deadRow: (t) => `Guarded code not run on ${t}`,
@@ -283,7 +290,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       lintSum: (p, e, d, f) => `Bukti dari PHP ${p} (php -l): ${e} error, ${d} deprecation dari ${f} file`, lintFail: 'Lint gagal dijalankan.', noLintErr: 'Tidak ada parse error atau fatal error.', parseErr: 'Parse / fatal error', compileDep: 'Deprecation saat kompilasi',
       pcSum: (v, n, k) => `PHPCompatibility (testVersion ${v}): ${n} pesan, ${k} jenis`, pcFail: 'PHPCompatibility: gagal dijalankan', sniff: 'Sniff', type: 'Tipe', example: 'Contoh', noMsg: 'Tidak ada pesan.',
       rcSum: (s, n) => `Rector ${s} (dry-run): ${n} file bisa diubah otomatis`, rcFail: 'Rector: gagal dijalankan', rcNote: 'Set ini juga berisi modernisasi opsional, misalnya array() menjadi []. Tidak semua perubahan wajib untuk kompatibilitas.', rcRule: 'Aturan Rector', noChange: 'Tidak ada perubahan.',
-      current: 'Saat ini', suggested: 'Disarankan',
+      current: 'Saat ini', evidence: 'Bukti', evKind: { 'php.net': 'php.net', rfc: 'RFC', 'php-src': 'php-src', changelog: 'Changelog', release: 'Rilis', upgrade: 'Panduan upgrade', source: 'Kode sumber', issue: 'Issue / PR', cve: 'CVE', advisory: 'Advisory', docs: 'Dokumentasi', run: 'Uji jalan' }, unsafeLink: 'link dibuang: bukan alamat http(s)', proofOn: (p, r) => `Diuji di PHP ${p}${r ? ': ' + r : ''}`, evRule: 'Sumber', suggested: 'Disarankan',
       cmpLead: (o, of, n, nf, a) => `<span class="mono">${o}</span> (${of} file) → <span class="mono">${n}</span> (${nf} file), diuji terhadap aplikasi <span class="mono">${a}</span>.`,
       overrideConflicts: 'Konflik override di aplikasi', apiUsage: 'Pemakaian API yang hilang/berubah', localPatched: 'File framework dipatch lokal', filesChanged: (c, a, r) => `File berubah · ${a} baru · ${r} dihapus`,
       cmpTable: (t, o, n) => `Temuan PHP ${t}: ${o} vs ${n}`, cmpTableLead: (t) => `Hitungan tidak termasuk kode yang terbukti tidak dijalankan di ${t}.`, parseErrRow: 'Parse error (php -l)', compileDepRow: 'Deprecation saat kompilasi', deadRow: (t) => `Kode dijaga, mati di ${t}`,
@@ -523,10 +530,26 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
     </section>`;
   }
 
+  /** Only http(s) links: notes are written from audited code, so never trust a scheme such as javascript:. */
+  const safeUrl = (u) => (typeof u === 'string' && /^https?:\/\/[^\s]+$/i.test(u) ? u : null);
+  function evidenceHtml(list, label) {
+    if (!Array.isArray(list) || !list.length) return '';
+    return `<div class="evidence"><div class="codelabel">${esc(label || T.evidence)}</div><ul>` + list.map((ev) => {
+      const e = typeof ev === 'string' ? { url: ev } : (ev || {});
+      const url = safeUrl(e.url);
+      const title = e.title || e.url || '';
+      let host = '';
+      try { host = url ? new URL(url).host : ''; } catch (x) { host = ''; }
+      const kind = e.kind ? `<span class="tag">${esc((T.evKind || {})[e.kind] || e.kind)}</span> ` : '';
+      const link = url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a>${host && title !== url ? ` <span class="sub mono">${esc(host)}</span>` : ''}`
+        : `${esc(title)}${e.url ? ` <span class="sub">(${esc(T.unsafeLink)})</span>` : ''}`;
+      return `<li>${kind}${link}${e.quote ? `<q>${esc(e.quote)}</q>` : ''}</li>`;
+    }).join('') + '</ul></div>';
+  }
   function notesHtml(notes) {
     if (!notes || !notes.length) return '';
     return `<div class="notes">` + notes.map((n) =>
-      `<div class="note"><div class="note-head">${pill(n.sev || 'info')}<h3>${esc(n.title)}</h3></div><p>${esc(n.body)}</p>${n.files ? `<div class="files">${n.files.map((f) => `<span class="tag mono">${esc(f)}</span>`).join('')}</div>` : ''}${codeHtml(n.code)}</div>`
+      `<div class="note"><div class="note-head">${pill(n.sev || 'info')}<h3>${esc(n.title)}</h3></div><p>${esc(n.body)}</p>${n.files ? `<div class="files">${n.files.map((f) => `<span class="tag mono">${esc(f)}</span>`).join('')}</div>` : ''}${codeHtml(n.code)}${evidenceHtml(n.evidence)}</div>`
     ).join('') + `</div>`;
   }
   function codeHtml(list) {
@@ -538,6 +561,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
         <div class="codecol"><div class="codelabel after">${esc(T.suggested)}</div><pre class="code">${esc(c.after || '')}</pre></div>
       </div>
       ${c.note ? `<p class="sub">${esc(c.note)}</p>` : ''}
+      ${c.proof && typeof c.proof === 'object' ? `<details class="proof"><summary>${esc(T.proofOn(c.proof.php || '?', c.proof.run || ''))}</summary>${c.proof.output ? `<pre class="code">${esc(c.proof.output)}</pre>` : ''}</details>` : ''}
     </div>`).join('');
   }
 
@@ -697,7 +721,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
             (hits.length > limit ? `<li><button type="button" class="more" data-more="${esc(id)}">${esc(T.showMore(hits.length - limit))}</button></li>` : '') + `</ul></td></tr>`;
           return `<tr class="rule-row" data-rule="${esc(id)}" tabindex="0" aria-expanded="${expanded}"><td><span class="caret">▸</span> ${pill(m.sev)}</td>
             <td class="mono">${esc(m.ver)}</td>
-            <td><div>${esc(m.title)}</div><div class="sub">${esc(m.fix)} <a href="${esc(m.ref)}" target="_blank" rel="noopener">php.net</a> · <span class="mono">${esc(id)}</span></div></td>
+            <td><div>${esc(m.title)}</div><div class="sub">${esc(m.fix)} ${safeUrl(m.ref) ? `<a href="${esc(m.ref)}" target="_blank" rel="noopener noreferrer">php.net</a>` : ''}${(m.evidence || []).filter((x) => safeUrl(x.url)).map((x) => ` · <a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc((T.evKind || {})[x.kind] || x.title || x.kind)}</a>`).join('')} · <span class="mono">${esc(id)}</span></div></td>
             <td class="num">${hits.length}<div class="sub">${files} ${esc(T.files)}</div></td><td>${esc(m.conf)}</td><td>${esc(auto)}</td></tr>${detail}`;
         }).join('') + '</tbody>';
     }
