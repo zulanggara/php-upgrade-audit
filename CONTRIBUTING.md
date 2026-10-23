@@ -38,6 +38,12 @@ See [`references/rules.md`](references/rules.md). In short:
 5. Run the scanner on a real project that already supports the target and read what it reports. A rule that
    fires on correct code is a bug.
 
+## Adding a library upgrade note
+
+Add an entry to `scripts/library_notes.php` with the package's own UPGRADE/CHANGELOG linked at a tag, run the
+change when it can be run, and record it in [`references/evidence.md`](references/evidence.md). Notes must say
+only what the upstream source says.
+
 ## Adding a framework adapter
 
 See [`scripts/adapters/README.md`](scripts/adapters/README.md): one `adapter.php` returning an array, a small

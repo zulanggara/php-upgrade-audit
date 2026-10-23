@@ -29,7 +29,20 @@
           "where": "src/Legacy.php:44",
           "before": "function __autoload($c) {}",
           "after": "spl_autoload_register(function ($c) {});",
-          "note": "Setelah ketiganya diubah, php -l di 8.5.12 tidak melaporkan syntax error."
+          "note": "Setelah ketiganya diubah, php -l di 8.5.12 tidak melaporkan syntax error.",
+          "proof": {
+            "php": "8.5.12",
+            "run": "php -l src/Legacy.php (after all three changes)",
+            "output": "No syntax errors detected in src/Legacy.php"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "php.net",
+          "title": "PHP 8.0 migration: backward incompatible changes",
+          "url": "https://www.php.net/manual/en/migration80.incompatible.php",
+          "quote": "Support for deprecated curly braces for offset access has been removed. The (real) and (unset) casts have been removed. The ability to specify an autoloader using an __autoload() function has been removed."
         }
       ]
     },
@@ -45,7 +58,20 @@
           "where": "src/Legacy.php:7-11",
           "before": "function Legacy()\n{\n    $this->declared = 1;\n    $this->undeclared = 2;\n}",
           "after": "public $undeclared;\n\npublic function __construct()\n{\n    $this->declared = 1;\n    $this->undeclared = 2;\n}",
-          "note": "Diuji di 8.5.12: properti terisi, tanpa deprecation."
+          "note": "Diuji di 8.5.12: properti terisi, tanpa deprecation.",
+          "proof": {
+            "php": "8.5.12",
+            "run": "php ctor.php (the suggested class, then var_dump((new Legacy())->declared))",
+            "output": "int(1)"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "php.net",
+          "title": "PHP 8.0 migration: backward incompatible changes",
+          "url": "https://www.php.net/manual/en/migration80.incompatible.php",
+          "quote": "Methods with the same name as the class are no longer interpreted as constructors."
         }
       ]
     },
@@ -61,7 +87,20 @@
           "where": "src/Legacy.php:54",
           "before": "$r = each($arr);",
           "after": "$key = key($arr);\n$r = $key === null ? false : [1 => $arr[$key], 'value' => $arr[$key], 0 => $key, 'key' => $key];\nnext($arr);",
-          "note": "Hasilnya persis sama dengan each() di PHP 7.4, dan pointer maju dengan cara yang sama."
+          "note": "Hasilnya persis sama dengan each() di PHP 7.4, dan pointer maju dengan cara yang sama.",
+          "proof": {
+            "php": "8.5.12",
+            "run": "php each.php (same array on 7.4.33 with each() gives the identical array)",
+            "output": "replacement: {\"1\":1,\"value\":1,\"0\":\"a\",\"key\":\"a\"} next key: b"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "php.net",
+          "title": "PHP 8.0 migration: backward incompatible changes",
+          "url": "https://www.php.net/manual/en/migration80.incompatible.php",
+          "quote": "each() has been removed."
         }
       ]
     },
@@ -77,7 +116,59 @@
           "where": "src/Legacy.php:19",
           "before": "echo \"Total: \" . $n + 1;",
           "after": "echo \"Total: \" . ($n + 1);",
-          "note": "Mencetak \"Total: 6\" di 7.4 dan 8.5.12."
+          "note": "Mencetak \"Total: 6\" di 7.4 dan 8.5.12.",
+          "proof": {
+            "php": "8.5.12",
+            "run": "php concat.php (7.4.33: the current code prints 1, the suggested one Total: 6)",
+            "output": "Total: 6"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "php.net",
+          "title": "PHP 8.0 migration: backward incompatible changes",
+          "url": "https://www.php.net/manual/en/migration80.incompatible.php",
+          "quote": "The precedence of the concatenation operator has changed relative to bitshifts and addition as well as subtraction."
+        },
+        {
+          "kind": "rfc",
+          "title": "RFC: Change the precedence of the concatenation operator",
+          "url": "https://wiki.php.net/rfc/concatenation_precedence"
+        }
+      ]
+    },
+    {
+      "sev": "perilaku",
+      "title": "password_hash() jadi lebih lambat: cost bcrypt 10 -> 12",
+      "body": "PHP 8.4 menaikkan cost default bcrypt dari 10 ke 12. Proses hash sekitar 4x lebih lama, dan password_needs_rehash() kini menganggap semua hash cost 10 perlu di-rehash, sehingga login akan menulis ulang hash lama. Cek beban endpoint login dan registrasi; pertahankan cost 10 secara eksplisit hanya bila waktu tambahannya tidak bisa diterima.",
+      "files": [
+        "src/Legacy.php:73"
+      ],
+      "code": [
+        {
+          "where": "src/Legacy.php:73",
+          "before": "$hash = password_hash($n, PASSWORD_DEFAULT);",
+          "after": "$hash = password_hash($n, PASSWORD_DEFAULT); // cost 12 sejak PHP 8.4; ['cost' => 10] mempertahankan kecepatan lama",
+          "note": "Tidak perlu diubah kecuali hash yang lebih lambat jadi masalah.",
+          "proof": {
+            "php": "8.5.12",
+            "run": "php bcrypt.php (8.3.36: $2y$10$ in ~60 ms, needs_rehash false)",
+            "output": "$2y$12$ (cost 12), time 239 ms, needs_rehash(cost 10 hash) = true"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "php-src",
+          "title": "PHP 8.4 UPGRADING: bcrypt cost",
+          "url": "https://github.com/php/php-src/blob/PHP-8.4/UPGRADING",
+          "quote": "The default value of the 'cost' option for PASSWORD_BCRYPT for password_hash() has been increased from '10' to '12'."
+        },
+        {
+          "kind": "rfc",
+          "title": "RFC: Increasing the default BCrypt cost",
+          "url": "https://wiki.php.net/rfc/bcrypt_cost_2023"
         }
       ]
     },
@@ -105,7 +196,26 @@
           "where": "src/Legacy.php:18",
           "before": "$out = `ls -la`;",
           "after": "$out = shell_exec('ls -la');",
-          "note": "Bagian yang berasal dari variabel dibungkus escapeshellarg()."
+          "note": "Bagian yang berasal dari variabel dibungkus escapeshellarg().",
+          "proof": {
+            "php": "8.5.12",
+            "run": "php -d error_reporting=-1 suggested.php",
+            "output": "NULL\nH\nint(5)\nlisting\n(0 deprecations; the current code gives 3 on php -l)"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "php.net",
+          "title": "PHP 8.4 migration: deprecated features (implicitly nullable parameter)",
+          "url": "https://www.php.net/manual/en/migration84.deprecated.php",
+          "quote": "A parameter's type is implicitly widened to accept null if the default value for it is null."
+        },
+        {
+          "kind": "php.net",
+          "title": "PHP 8.5 migration: deprecated features (non-canonical casts, backtick operator)",
+          "url": "https://www.php.net/manual/en/migration85.deprecated.php",
+          "quote": "The backtick operator as an alias for shell_exec() has been deprecated."
         }
       ]
     },
@@ -123,6 +233,30 @@
           "before": "\"phpoffice/phpexcel\": \"^1.8\",\n\"swiftmailer/swiftmailer\": \"^5.4\",",
           "after": "\"phpoffice/phpspreadsheet\": \"^2.0\",\n\"symfony/mailer\": \"^7.0\",",
           "note": "API-nya berbeda: rencanakan migrasi kode pemanggilnya."
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "php.net",
+          "title": "PHP 7.2: MCrypt moved to PECL",
+          "url": "https://www.php.net/manual/en/migration72.other-changes.php",
+          "quote": "The MCrypt extension has now been moved out of the core to PECL."
+        },
+        {
+          "kind": "php.net",
+          "title": "PHP 7.0: removed extensions (mysql)",
+          "url": "https://www.php.net/manual/en/migration70.removed-exts-sapis.php"
+        },
+        {
+          "kind": "release",
+          "title": "phpoffice/phpexcel on Packagist (abandoned)",
+          "url": "https://packagist.org/packages/phpoffice/phpexcel"
+        },
+        {
+          "kind": "changelog",
+          "title": "firebase/php-jwt 7.0.0: key size validation",
+          "url": "https://github.com/firebase/php-jwt/blob/v7.0.0/CHANGELOG.md",
+          "quote": "This fix will cause keys with a size below the minimally allowed size to break."
         }
       ]
     }

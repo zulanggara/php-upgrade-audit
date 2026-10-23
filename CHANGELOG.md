@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.1.0 (2026-10-23)
+
+Every finding can now be checked at its source, and installed copies keep themselves up to date.
+
+### Added
+
+- Evidence in `notes.json`: `evidence` (kind, title, url, optional quote) on every note and `proof` (PHP
+  version, command, output) on every Current/Suggested code pair. The report links each source and shows the
+  run under the code. `validate_notes.php` warns when a must-fix, deprecated or behaviour note has no evidence,
+  and refuses links that are not `http(s)`. Checked sources and how to cite them: `references/evidence.md`.
+- `evidence` on scanner rules, linked next to the php.net reference in the findings table.
+- Rule `P84-BCRYPT-COST`: `password_hash()` / `password_needs_rehash()` with the default bcrypt cost, which
+  goes from 10 to 12 in PHP 8.4 (about 4 times slower per hash; old hashes need a rehash).
+- Library upgrade notes with their upstream sources (`scripts/library_notes.php`): firebase/php-jwt 7.0
+  (HMAC keys shorter than the algorithm are rejected; run on PHP 8.5.12), Guzzle 7, Monolog 2 and 3.
+  `libs.json` also links each public package to Packagist, its source repository and the release to move to.
+- `scripts/update.sh`, run by SKILL.md and AGENTS.md at the start of every audit (at most once a day): a git
+  clone fast-forwards to the published version when it has no local changes; a Claude Code plugin is updated
+  with `claude plugin update`, or the command is printed. `PHP_UPGRADE_AUDIT_NO_UPDATE=1` or `--offline`
+  turns it off.
+- The kit version and commit in `report.json` and the report footer.
+
+### Fixed
+
+- `validate_notes.php` checked `overview.en.json` / `overview.id.json` as notes files.
+- `tests/page_check.js` fails on any link that is not `http(s)` or an anchor.
+
 ## 1.0.0 (2026-10-22)
 
 First release meant for use by other people and agents, on any kind of PHP project.

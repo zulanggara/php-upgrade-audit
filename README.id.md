@@ -18,7 +18,7 @@ per repo, riwayat setiap scan, dan dashboard.
 - [Memakai lewat AI agent](#memakai-lewat-ai-agent): contoh perintah, sudah atau belum dipasang
 - [Instalasi](#instalasi): skill atau plugin Claude Code, agent lain, manual
 - [Menjalankan manual](#menjalankan-manual) · [CI](#ci) · [Memilih target](#memilih-versi-php-target)
-- [Yang diperiksa](#yang-diperiksa) · [Laporan](#laporan) · [Privasi](#privasi-dan-jaringan) · [Batasan](#batasan)
+- [Yang diperiksa](#yang-diperiksa) · [Bukti](#bukti-evidence) · [Laporan](#laporan) · [Update](#update) · [Privasi](#privasi-dan-jaringan) · [Batasan](#batasan)
 
 ## Memakai lewat AI agent
 
@@ -106,7 +106,8 @@ Di versi Claude Code yang lebih lama, dalam dua langkah:
 ```
 
 Tool analisa tidak ikut terunduh bersama plugin. Skill akan menjalankan `scripts/setup.sh` saat pertama
-dipakai, dan lagi setelah plugin diperbarui.
+dipakai, dan lagi setelah plugin diperbarui. Supaya versi baru diterima otomatis, nyalakan auto-update sekali:
+`/plugin` > Marketplaces > php-upgrade-audit > Enable auto-update (lihat [Update](#update)).
 
 ### AI agent lain, atau manual
 
@@ -183,6 +184,24 @@ merangkum jumlah temuan per tingkat.
 
 Kode yang diaudit tidak pernah diubah, dan `composer` maupun Rector tidak pernah dijalankan di dalamnya.
 
+## Bukti (evidence)
+
+Setiap kesimpulan menautkan sumber yang bisa dicek sendiri oleh pembaca:
+
+- **Temuan scanner** menautkan halaman migrasi php.net, juga RFC atau `UPGRADING` php-src bila relevan
+  (misalnya perubahan cost bcrypt di 8.4).
+- **Library** menautkan halaman Packagist, repo sumber, dan halaman rilis versi yang disarankan. Perubahan yang
+  merusak di package populer disertai sumbernya sendiri, dibaca pada tag tertentu: misalnya firebase/php-jwt 7.0
+  menolak kunci HMAC yang lebih pendek dari algoritmanya (HS256 butuh 32 byte), lengkap dengan changelog, PR,
+  baris kode sumbernya, dan hasil uji di PHP 8.5.12 (v6.11.1 menerima kunci 12 byte, v7.2.1 melempar
+  `Provided key is too short`). Lihat [`scripts/library_notes.php`](scripts/library_notes.php).
+- **Catatan analis** memuat `evidence` (php.net, RFC, php-src, changelog, catatan rilis, kode sumber, advisory)
+  dan, untuk setiap saran perubahan kode, `proof` hasil uji jalannya di PHP target. `validate_notes.php`
+  memberi peringatan bila catatan wajib, deprecated, atau perubahan perilaku tidak punya sumber.
+
+[`references/evidence.md`](references/evidence.md) berisi urutan sumber yang diutamakan, cara menautkan supaya
+link tetap valid, dan perubahan yang sudah diverifikasi (cost bcrypt, ukuran kunci php-jwt, Guzzle 7, Monolog 2/3).
+
 ## Laporan
 
 - Satu file HTML mandiri. Bisa dipakai sebagai [Claude Artifact](https://claude.ai) atau dibuka lokal.
@@ -191,8 +210,23 @@ Kode yang diaudit tidak pernah diubah, dan `composer` maupun Rector tidak pernah
   berapa temuan yang teratasi, baru, atau tetap dibanding scan sebelumnya.
 - Setiap halaman punya anchor: `#<repo>` (scan terakhir) atau `#<repo>~<scan-id>` (scan tertentu).
 - Catatan analis dengan perbandingan kode **Saat ini vs Disarankan**, yang wajib diuji agent di PHP target
-  sebelum disarankan. `validate_notes.php` memeriksa formatnya.
+  sebelum disarankan, hasil uji jalannya, dan link [bukti](#bukti-evidence). `validate_notes.php` memeriksa
+  formatnya. Hanya link `http(s)` yang ditampilkan.
+- Footer menyebut versi kit yang membuat laporan.
 - Bahasa Inggris atau Indonesia (`--lang=en|id`), tema terang dan gelap, tampilan ponsel.
+
+## Update
+
+Skill menjalankan `scripts/update.sh` setiap kali audit dimulai, jadi salinan yang terpasang selalu ikut versi terbaru:
+
+| Terpasang sebagai | Yang terjadi |
+|---|---|
+| git clone (`~/.claude/skills/...`, `~/tools/...`) | Dicek ke GitHub paling sering sekali sehari, lalu di-fast-forward ke `main` terbaru; `setup.sh` dijalankan ulang bila tool analisa berubah. Clone yang punya perubahan lokal atau di branch lain tidak pernah disentuh, hanya diberi tahu. |
+| Plugin Claude Code | Claude Code memperbarui plugin sendiri setelah auto-update dinyalakan (`/plugin` > Marketplaces > php-upgrade-audit > Enable auto-update; default-nya mati untuk marketplace pihak ketiga). Kalau belum, `update.sh` menjalankan `claude plugin update` bila bisa, atau meminta Anda menjalankan `/plugin marketplace update php-upgrade-audit`. |
+| Salinan unduhan | `update.sh` memberi tahu bila ada versi baru. |
+
+Manual: `bash scripts/update.sh --force` (cek sekarang), `--check` (hanya melaporkan). Matikan dengan
+`PHP_UPGRADE_AUDIT_NO_UPDATE=1` atau `--offline`.
 
 ## Privasi dan jaringan
 
@@ -203,6 +237,8 @@ Kode yang diaudit tidak pernah diubah, dan `composer` maupun Rector tidak pernah
 - Akses jaringan saat audit: nama package publik ke `repo.packagist.org` (package privat dilewati), dan dengan
   `--load-classes`, `composer install` biasa untuk package yang terkunci di salinan sementara (dari sumber yang
   ditulis `composer.lock`, dengan kredensial Composer Anda sendiri). `--offline` mematikan keduanya.
+- `scripts/update.sh` mengecek versi baru kit ini ke GitHub paling sering sekali sehari (satu `git fetch`, atau
+  satu request untuk `plugin.json` yang terpublikasi). `PHP_UPGRADE_AUDIT_NO_UPDATE=1` mematikannya.
 - HTML memuat font IBM Plex dari Google Fonts. Render dengan `--offline` untuk halaman tanpa request eksternal sama sekali.
 - Tidak ada telemetri. Laporan bisa memuat masalah keamanan kode yang diaudit, jadi bagikan dengan hati-hati.
 

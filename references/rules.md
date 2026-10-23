@@ -2,7 +2,9 @@
 
 Rules live in `scripts/rules.php` (Indonesian title/fix) and `scripts/rules_en.php` (English title/fix, keyed by
 rule id). One entry is one kind of problem. Required fields: `id`, `sev`, `ver`, `conf`, `kind`, `title`, `fix`,
-`ref`. Optional `rector` names the Rector rule that fixes it; the report uses it for the "Rector" column.
+`ref`. Optional `rector` names the Rector rule that fixes it; the report uses it for the "Rector" column. Optional
+`evidence` lists sources beyond `ref` (`[['kind' => 'rfc', 'title' => ..., 'url' => ...]]`, kinds and rules in
+[`evidence.md`](evidence.md)); the report links them next to php.net.
 
 - Take the content from the official pages
   `https://www.php.net/manual/en/migrationXY.incompatible.php` / `.deprecated.php`, not from memory.

@@ -17,7 +17,7 @@ per repository, a version history of every scan, and a dashboard.
 - [Use it with an AI agent](#use-it-with-an-ai-agent): example prompts, with or without installing first
 - [Install](#install): Claude Code skill or plugin, other agents, by hand
 - [Use it by hand](#use-it-by-hand) · [CI](#ci) · [Choosing the target](#choosing-the-target-php)
-- [What it checks](#what-it-checks) · [Report](#report) · [Privacy](#privacy-and-network) · [Limits](#limits)
+- [What it checks](#what-it-checks) · [Evidence](#evidence) · [Report](#report) · [Updates](#updates) · [Privacy](#privacy-and-network) · [Limits](#limits)
 
 ## Use it with an AI agent
 
@@ -104,7 +104,8 @@ On older Claude Code versions, in two steps:
 ```
 
 The analysis tools are not part of the plugin download; the skill runs `scripts/setup.sh` on first use (and
-after a plugin update).
+after a plugin update). To receive new versions automatically, turn on auto-update once: `/plugin` >
+Marketplaces > php-upgrade-audit > Enable auto-update (see [Updates](#updates)).
 
 ### Other AI agents, or by hand
 
@@ -181,6 +182,24 @@ summarises the findings per level.
 
 It never modifies the audited code and never runs `composer` or Rector in it.
 
+## Evidence
+
+Every conclusion links to where a reader can check it:
+
+- **Scanner findings** link their php.net migration page, and the RFC or php-src `UPGRADING` where it matters
+  (for example the bcrypt cost change in 8.4).
+- **Libraries** link their Packagist page, source repository and the release page of the suggested version.
+  Known breaking changes of popular packages come with their own source, read at a tag: for example
+  firebase/php-jwt 7.0 rejects HMAC keys shorter than the algorithm (HS256 needs 32 bytes), with the changelog,
+  the PR, the source line, and a run on PHP 8.5.12 (v6.11.1 accepts a 12-byte key, v7.2.1 throws
+  `Provided key is too short`). See [`scripts/library_notes.php`](scripts/library_notes.php).
+- **Analyst notes** carry `evidence` (php.net, RFC, php-src, changelog, release notes, source, advisory) and,
+  for every suggested change, the `proof` of the run on the target PHP. `validate_notes.php` warns when a
+  must-fix, deprecated or behaviour note has no source.
+
+[`references/evidence.md`](references/evidence.md) lists which sources to prefer, how to link them so they stay
+valid, and the changes already checked (bcrypt cost, php-jwt key size, Guzzle 7, Monolog 2/3).
+
 ## Report
 
 - One self-contained HTML file. Works as a [Claude Artifact](https://claude.ai) or as a local page.
@@ -189,8 +208,23 @@ It never modifies the audited code and never runs `composer` or Rector in it.
   findings were resolved, are new, or unchanged since the previous scan.
 - Every page has an anchor: `#<repo>` (latest scan) or `#<repo>~<scan-id>` (a specific scan).
 - Analyst notes with **Current vs Suggested** code, which the agent must run on the target PHP before
-  suggesting it. `validate_notes.php` checks their format.
+  suggesting it, the output of that run, and the [evidence](#evidence) links. `validate_notes.php` checks
+  their format. Only `http(s)` links are rendered.
+- The footer names the kit version that produced the report.
 - English or Indonesian (`--lang=en|id`), light and dark theme, phone layout.
+
+## Updates
+
+The skill runs `scripts/update.sh` at the start of every audit, so an installed copy keeps up by itself:
+
+| Installed as | What happens |
+|---|---|
+| git clone (`~/.claude/skills/...`, `~/tools/...`) | Checked against GitHub at most once a day and fast-forwarded to the latest `main`; `setup.sh` re-runs when the analysis tools changed. A clone with local changes or on another branch is never touched, only reported. |
+| Claude Code plugin | Claude Code updates plugins itself once auto-update is on (`/plugin` > Marketplaces > php-upgrade-audit > Enable auto-update; it is off by default for third-party marketplaces). Otherwise `update.sh` runs `claude plugin update` when it can, or tells you to run `/plugin marketplace update php-upgrade-audit`. |
+| Downloaded copy | `update.sh` tells you when a newer version exists. |
+
+By hand: `bash scripts/update.sh --force` (check now), `--check` (report only). Turn it off with
+`PHP_UPGRADE_AUDIT_NO_UPDATE=1` or `--offline`.
 
 ## Privacy and network
 
@@ -201,6 +235,8 @@ It never modifies the audited code and never runs `composer` or Rector in it.
 - Network during an audit: public package names to `repo.packagist.org` (private packages are skipped) and,
   with `--load-classes`, a normal `composer install` of the locked packages in a scratch copy (from wherever
   `composer.lock` points, with your own Composer credentials). `--offline` disables both.
+- `scripts/update.sh` checks GitHub for a new version of this kit at most once a day (a `git fetch`, or one
+  request for the published `plugin.json`). `PHP_UPGRADE_AUDIT_NO_UPDATE=1` turns it off.
 - The HTML loads IBM Plex from Google Fonts. Render with `--offline` for a page with no external request at all.
 - No telemetry. Reports can describe security problems of the audited code: share them with care.
 

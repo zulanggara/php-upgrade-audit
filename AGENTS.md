@@ -27,18 +27,24 @@ Inputs to settle first (ask the user when they did not say):
 3. Rector only with `--dry-run` (the scripts enforce this).
 4. No data leaves the machine except public package names sent to repo.packagist.org (private packages are
    skipped), and, with `--load-classes`, the downloads of a normal `composer install` in the scratch copy. Use
-   `--offline` to disable both. Render with `--offline` for a page without web fonts.
+   `--offline` to disable both. Render with `--offline` for a page without web fonts. `scripts/update.sh`
+   checks GitHub once a day for a new version of this kit (`PHP_UPGRADE_AUDIT_NO_UPDATE=1` turns it off).
+8. Every claim in a note is checkable: link its sources in `evidence` (only sources you opened) and record the
+   run of suggested code in `proof`.
 5. Never put secrets in notes or code samples. Tool output and the report are redacted automatically, but you
    must also mask anything you type yourself (`ghp_••••••`, `«REDACTED»`).
 6. History is append-only: every scan is a new version. Never delete or overwrite `<store>/<name>/scans/<id>/`.
 7. Prove claims about PHP behaviour by running a small snippet on the target PHP, or cite php.net.
 
-## Setup (once)
+## Setup (once), and update (every run)
 
 ```bash
-bash <TOOL>/scripts/setup.sh   # PHP 8.1+, Composer, git; installs and checks the tools in <TOOL>/tools
+bash <TOOL>/scripts/update.sh  # every run: updates a git clone (once a day); prints "update: <state>"
+bash <TOOL>/scripts/setup.sh   # once: PHP 8.1+, Composer, git; installs and checks the tools in <TOOL>/tools
 php -v                         # php -l and class loading prove behaviour on THIS version
 ```
+
+When `update.sh` prints `update: updated`, read this file again before continuing.
 
 If `php -v` is not the target version, find the target binary (`php8.3`, `/opt/homebrew/opt/php@8.3/bin/php`)
 and pass `--php=<binary>` to `audit.php`. If there is none, tell the user (package manager, Homebrew, or
@@ -62,7 +68,10 @@ the proof.
    `php <TOOL>/scripts/compare_framework.php --old=<old> --new=<new> --app=<repo> [--official=<release>] [--new-config=<dir>] [--app-config=<dir>] --name="<name>" --store=<STORE>`
    Framework adapters live in `scripts/adapters/` (CodeIgniter 3 bundled, detected automatically).
 5. **Write notes** to `<STORE>/<name>/scans/<id>/notes.json` (format below). Every note that needs a code
-   change has a Current/Suggested `code` pair that you have run on the target PHP.
+   change has a Current/Suggested `code` pair that you have run on the target PHP (record it in `proof`), and
+   every `wajib`/`deprecated`/`perilaku` note has `evidence`: php.net, RFC, php-src `UPGRADING`, the library's
+   `UPGRADE`/`CHANGELOG`/release notes at a tag, or the source line. Reuse the links of scanner rules and of
+   `libs.json` `upgrade_notes`; `references/evidence.md` lists checked sources for common changes.
 6. **Write the overview** to `<STORE>/overview.json`.
 7. **Check** them: `php <TOOL>/scripts/validate_notes.php --store=<STORE>` and fix every error.
 8. **Render** the report:
@@ -86,7 +95,10 @@ the proof.
       "title": "Short title",
       "body": "What is wrong, the impact, how to fix it.",
       "files": ["path/file.php:123"],
-      "code": [{"where": "path/file.php:123", "before": "current code, secrets masked", "after": "suggested code", "note": "optional"}]
+      "code": [{"where": "path/file.php:123", "before": "current code, secrets masked", "after": "suggested code", "note": "optional",
+                "proof": {"php": "8.5.12", "run": "php check.php", "output": "what it printed"}}],
+      "evidence": [{"kind": "php.net|rfc|php-src|changelog|release|upgrade|source|issue|cve|advisory|docs|run",
+                    "title": "What the source is", "url": "https://...", "quote": "short exact quote"}]
     }
   ]
 }

@@ -34,6 +34,8 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
 - Rector only runs with `--dry-run` (enforced by `run_tools.php`).
 - Private packages (no Packagist `notification-url`) are never sent to Packagist. Use `--offline` to make no
   network request at all (`--load-classes` then skips the scratch install).
+  `scripts/update.sh` contacts GitHub once a day to check for a new version of this kit (opt out with
+  `PHP_UPGRADE_AUDIT_NO_UPDATE=1`).
 - Do not conclude from memory. Prove PHP behaviour by running a snippet on the target PHP, or cite php.net.
 - **Secrets never leave the machine in clear text.** Tool output and the rendered report are redacted
   automatically (`scripts/redact.php`). When you write notes or code samples yourself, mask secrets too
@@ -42,6 +44,10 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
 
 ## Before the first audit
 
+0. **Update (every run).** `bash ${CLAUDE_SKILL_DIR}/scripts/update.sh`. It checks at most once a day, never
+   touches a clone with local changes, and ends with one line `update: <state>`. When it says `updated`,
+   read `${CLAUDE_SKILL_DIR}/SKILL.md` again before continuing: the workflow may have changed. Skip it only when
+   the user asked for no network (`--offline`) or set `PHP_UPGRADE_AUDIT_NO_UPDATE=1`.
 1. **Tools.** If `${CLAUDE_SKILL_DIR}/tools/vendor/autoload.php` does not exist, run
    `bash ${CLAUDE_SKILL_DIR}/scripts/setup.sh` (installs Rector, PHP_CodeSniffer + PHPCompatibility and
    composer/semver into `${CLAUDE_SKILL_DIR}/tools`; needs PHP 8.1+, Composer, git). It ends by checking the
@@ -104,13 +110,26 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
      "notes": [
        {"sev": "wajib|deprecated|perilaku|info", "title": "Short title", "body": "What, impact, how to fix.",
         "files": ["path/file.php:123"],
-        "code": [{"where": "file:line", "before": "current code (copied exactly, secrets masked)", "after": "suggested code", "note": "optional"}]}
+        "code": [{"where": "file:line", "before": "current code (copied exactly, secrets masked)", "after": "suggested code", "note": "optional",
+                  "proof": {"php": "8.5.12", "run": "php check.php", "output": "what it printed"}}],
+        "evidence": [{"kind": "php-src", "title": "PHP 8.4 UPGRADING: bcrypt cost 10 -> 12", "url": "https://github.com/php/php-src/blob/PHP-8.4/UPGRADING",
+                      "quote": "short exact quote from the source"}]}
      ]
    }
    ```
    - Order by urgency; merge similar findings into one note; do not repeat the tables.
    - Every note that needs a code change gets `code` (Current vs Suggested). **Run the suggested code on the
-     target PHP first**: no deprecation, and the same result as today unless the change is intended.
+     target PHP first**: no deprecation, and the same result as today unless the change is intended. Record
+     that run in `proof` (PHP version, what you ran, what it printed).
+   - **Every `wajib`, `deprecated` and `perilaku` note carries `evidence`**: the sources a reader can open to
+     check the claim. Prefer, in this order: the php.net migration page or function page, the RFC, php-src
+     `UPGRADING`/`NEWS` at the release branch, the library's own `UPGRADE`/`CHANGELOG`/release notes linked at
+     a tag, the source line that does it, an advisory/CVE. Use `kind` (`php.net`, `rfc`, `php-src`,
+     `changelog`, `release`, `upgrade`, `source`, `issue`, `cve`, `advisory`, `docs`, `run`) and a short exact
+     `quote`. Only cite what you opened; never invent a URL. `references/evidence.md` lists checked sources for
+     common changes (bcrypt cost, php-jwt key length...).
+   - Scanner rules already link their php.net page (and RFC where known); library upgrade notes in
+     `libs.json` (`upgrade_notes`) come with their own evidence: reuse those links in your notes.
    - For a re-scan: compare with the previous version (the report shows resolved / new / unchanged), update
      the notes, and remove `carried_from` once reviewed.
 
@@ -121,7 +140,8 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
    ```
 
 7. **Check the notes**: `php ${CLAUDE_SKILL_DIR}/scripts/validate_notes.php --store=<STORE>`. Fix every error
-   (wrong `sev`, missing `after`, a secret, `carried_from` left on the latest scan) before rendering.
+   (wrong `sev`, missing `after`, a secret, a non-https evidence URL, `carried_from` left on the latest scan)
+   and every "no evidence" warning before rendering.
 
 8. **Render** one report from the whole store:
    ```bash
@@ -160,6 +180,8 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
 | `scripts/validate_notes.php` | Check notes.json / overview.json against the format |
 | `scripts/history.php` | History store helpers; `list` / `migrate` CLI |
 | `scripts/redact.php` | Secret redaction used by every writer and the renderer |
+| `scripts/library_notes.php` | Breaking changes of popular packages, with upstream sources |
+| `scripts/update.sh` | Self-update (run first, see above) |
 | `scripts/render.php` | Store → one HTML report (`assets/report-template.html`) |
 
 Exit codes of every script: 0 ok, 1 wrong usage, 2 environment problem, 4 `render.php` refused to write a report

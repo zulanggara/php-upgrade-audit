@@ -17,7 +17,25 @@
           "where": "src/Model/Report.php:6",
           "before": "public function handle($input, $format)",
           "after": "public function handle($input, $format = '')",
-          "note": "Dimuat tanpa warning di 7.4 dan 8.5.12; pemanggil yang mengirim $format tidak berubah."
+          "note": "Dimuat tanpa warning di 7.4 dan 8.5.12; pemanggil yang mengirim $format tidak berubah.",
+          "proof": {
+            "php": "8.5.12",
+            "run": "php fix.php (also on 7.4.33, no warning)",
+            "output": "y:x 0"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "php.net",
+          "title": "PHP 8.0 migration: backward incompatible changes",
+          "url": "https://www.php.net/manual/en/migration80.incompatible.php",
+          "quote": "Inheritance errors due to incompatible method signatures (LSP violations) will now always generate a fatal error. Previously a warning was generated in some cases."
+        },
+        {
+          "kind": "rfc",
+          "title": "RFC: Always generate fatal error for incompatible method signatures",
+          "url": "https://wiki.php.net/rfc/lsp_errors"
         }
       ]
     },
@@ -32,7 +50,20 @@
         {
           "where": "src/Model/Counter.php:6",
           "before": "public function count()",
-          "after": "public function count(): int"
+          "after": "public function count(): int",
+          "proof": {
+            "php": "8.5.12",
+            "run": "php fix.php (Counter::count(): int, also on 7.4.33)",
+            "output": "y:x 0"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "php.net",
+          "title": "PHP 8.1 migration: tentative return types",
+          "url": "https://www.php.net/manual/en/migration81.incompatible.php",
+          "quote": "a ReturnTypeWillChange attribute can be added to silence the deprecation notice."
         }
       ]
     },
