@@ -148,7 +148,7 @@ final class Scanner
         }
     }
 
-    private function add(string $rule, int $line): void
+    private function add(string $rule, int $line, array $extra = []): void
     {
         $code = trim($this->lines[$line - 1] ?? '');
         $long = strlen($code) > 200 && isset($this->sig[$this->at]);
@@ -166,7 +166,7 @@ final class Scanner
         if (strlen($code) > 220) {
             $code = substr($code, 0, 217) . '...';
         }
-        $finding = ['rule' => $rule, 'file' => $this->file, 'line' => $line, 'code' => $code];
+        $finding = ['rule' => $rule, 'file' => $this->file, 'line' => $line, 'code' => $code] + $extra;
         $guard = $this->guardAt($this->at);
         if ($guard !== null) {
             $state = $this->evalGuard($guard);
@@ -576,6 +576,13 @@ final class Scanner
             }
             if ($id === T_NEW) {
                 $cls = $this->id($i + 1);
+                if (isset($this->special['null_to_internal']) && $this->id($i + 2) === '(' && ($fq = $this->resolveClass($i + 1)) !== null) {
+                    [$cargs, , $cspread] = $this->parseArgs($i + 2);
+                    if (!$cspread) {
+                        $this->at = $i;
+                        $this->checkNullArgs($i + 1, 'new:' . $fq, $cargs);
+                    }
+                }
                 if (in_array($cls, [T_STRING, T_NAME_FULLY_QUALIFIED], true)) {
                     $name = self::lastSegment($this->text($i + 1));
                     if ($cls === T_STRING || substr_count($this->text($i + 1), '\\') === 1) {
@@ -639,6 +646,9 @@ final class Scanner
         }
         $line = $this->sig[$i][2];
         [$args, $close, $spread] = $this->parseArgs($i + 1);
+        if (isset($this->special['null_to_internal']) && !$spread) {
+            $this->checkNullArgs($i, $name, $args);
+        }
         foreach ($this->byKind['func'] ?? [] as $r) {
             if (!$this->mentioned($r)) {
                 continue;
@@ -688,10 +698,212 @@ final class Scanner
         }
     }
 
+    /**
+     * PHP 8.1: null passed to a scalar parameter of an internal function is deprecated (a TypeError in 9.0).
+     * Reported when the argument is null, "... ?? null", a call that returns null when a value is missing
+     * (request input, session, URI segment, env/config...), a superglobal element read without isset(), or a
+     * variable assigned from one of those in the same function and not checked before the call.
+     */
+    private function checkNullArgs(int $i, string $name, array $args): void
+    {
+        $positions = self::nullParams()[$name] ?? null;
+        if ($positions === null || (!str_contains($name, ':') && $this->definesFunction($name))) {
+            return;
+        }
+        foreach ($positions as $pos) {
+            if (!isset($args[$pos]) || $this->isNamedArg($args[$pos][0])) {
+                continue;
+            }
+            $why = $this->nullableExpr($args[$pos][0], $args[$pos][1], $i);
+            if ($why !== null) {
+                $func = str_starts_with($name, 'new:') ? 'new ' . substr($name, 4) : $name;
+                $this->add($this->special['null_to_internal'], $this->sig[$i][2], ['conf' => $why['conf'], 'detail' => ['func' => $func, 'param' => $pos + 1] + $why]);
+                return;
+            }
+        }
+    }
+
+    /** Internal functions => 0-based positions of scalar parameters that reject null (null_params.php + this PHP). */
+    private static function nullParams(): array
+    {
+        static $map = null;
+        if ($map !== null) {
+            return $map;
+        }
+        $map = require __DIR__ . '/null_params.php';
+        foreach (get_defined_functions()['internal'] as $fn) {
+            $fn = strtolower($fn);
+            if (isset($map[$fn])) {
+                continue;
+            }
+            $pos = [];
+            foreach ((new ReflectionFunction($fn))->getParameters() as $p) {
+                $t = $p->getType();
+                if ($t === null || $t->allowsNull() || $p->isPassedByReference() || $p->isVariadic()) {
+                    continue;
+                }
+                $names = $t instanceof ReflectionUnionType ? array_map(fn ($x) => $x->getName(), $t->getTypes()) : [$t instanceof ReflectionNamedType ? $t->getName() : ''];
+                if (array_intersect($names, ['bool', 'int', 'float', 'string', 'true', 'false']) !== []) {
+                    $pos[] = $p->getPosition();
+                }
+            }
+            if ($pos !== []) {
+                $map[$fn] = $pos;
+            }
+        }
+        return $map;
+    }
+
+    /** Lowercase fully qualified name of a class token at $k, following the file's namespace and use imports. */
+    private function resolveClass(int $k): ?string
+    {
+        $id = $this->id($k);
+        $text = $this->text($k);
+        if ($id === T_NAME_FULLY_QUALIFIED) {
+            return strtolower(ltrim($text, '\\'));
+        }
+        if ($id !== T_STRING && $id !== T_NAME_QUALIFIED) {
+            return null;
+        }
+        $lower = strtolower($text);
+        if (in_array($lower, ['self', 'static', 'parent'], true)) {
+            return null;
+        }
+        $first = explode('\\', $lower)[0];
+        $q = preg_quote($first, '#');
+        if (preg_match('#^\s*use\s+\\\\?((?:[\w\\\\]+\\\\)?' . $q . ')\s*;#m', $this->codeLower, $m)
+            || preg_match('#^\s*use\s+\\\\?([\w\\\\]+)\s+as\s+' . $q . '\s*;#m', $this->codeLower, $m)) {
+            return $m[1] . substr($lower, strlen($first));
+        }
+        return preg_match('/^\s*namespace\s+[\w\\]+\s*[;{]/m', $this->codeLower) ? null : $lower;
+    }
+
+    /** The file declares its own function with this name (e.g. a polyfill in a namespace). */
+    private function definesFunction(string $name): bool
+    {
+        return (bool) preg_match('/\bfunction\s+&?\s*' . preg_quote($name, '/') . '\s*\(/', $this->codeLower);
+    }
+
+    private function isNamedArg(int $a): bool
+    {
+        return $this->id($a) === T_STRING && $this->id($a + 1) === ':' && $this->id($a + 2) !== ':';
+    }
+
+    /** Text of tokens $a..$b without spaces. */
+    private function compact(int $a, int $b): string
+    {
+        $out = '';
+        for ($k = $a; $k <= $b; $k++) {
+            $out .= $this->text($k);
+        }
+        return $out;
+    }
+
+    /** Calls that return null when the value is missing: [regex on the compact call, max args without a default, label]. */
+    private const NULLABLE_SOURCES = [
+        ['/^(\$this|\$\w+|get_instance\(\))->input->(post|get|get_post|post_get|cookie|server|user_agent|input_stream)\(/i', 99, 'CodeIgniter input'],
+        ['/^(\$this|\$\w+|get_instance\(\))->session->(userdata|flashdata|tempdata)\(/i', 99, 'CodeIgniter session'],
+        ['/^(\$this|\$\w+|get_instance\(\))->uri->(segment|rsegment)\(/i', 1, 'CodeIgniter URI segment'],
+        ['/^\$request->(input|query|post|header|cookie|old|get|route|json)\(/i', 1, 'request input'],
+        ['/^\$request->(query|request|headers|cookies|attributes|server|files)->get\(/i', 1, 'request input'],
+        ['/^\\\\?(Illuminate\\\\Support\\\\Facades\\\\)?(Request|Input)::(input|get|query|post|header|cookie|old)\(/i', 1, 'request input'],
+        ['/^\\\\?(request|old|session|env|config)\(/i', 1, 'helper without a default'],
+        ['/^\\\\?(Arr::get|data_get|array_get)\(/i', 2, 'array lookup without a default'],
+        ['/^\\\\?filter_input\(/i', 99, 'filter_input()'],
+        ['/^\$wpdb->get_var\(/i', 99, '$wpdb->get_var()'],
+    ];
+
+    /** @return array{conf: string, source: string, via?: string, kind: string}|null */
+    private function nullableExpr(int $a, int $b, int $before): ?array
+    {
+        $text = $this->compact($a, $b);
+        $lower = strtolower($text);
+        if ($lower === 'null' || $lower === '\null') {
+            return ['conf' => 'tinggi', 'kind' => 'null', 'source' => 'null'];
+        }
+        if (str_ends_with($lower, '??null')) {
+            return ['conf' => 'tinggi', 'kind' => 'coalesce-null', 'source' => $text];
+        }
+        if (preg_match('/^\$_(GET|POST|REQUEST|COOKIE|SERVER|FILES|ENV|SESSION)\[[^\[\]]+\]$/', $text)) {
+            $key = preg_quote($lower, '/');
+            $key = preg_replace('/\\\\\[[\'"]/', '\\[\s*[\'"]', $key);
+            if (preg_match('/(isset|empty|array_key_exists)\s*\([^;]*' . $key . '|' . $key . '\s*\?\?/', $this->codeLower)) {
+                return null;
+            }
+            return ['conf' => 'rendah', 'kind' => 'superglobal', 'source' => $text];
+        }
+        foreach (self::NULLABLE_SOURCES as [$re, $maxArgs, $label]) {
+            if (!preg_match($re, $text)) {
+                continue;
+            }
+            // The whole argument is that one call, and no default value was given.
+            for ($o = $a; $o <= $b && $this->id($o) !== '('; $o++);
+            [$inner, $close] = $this->parseArgs($o);
+            if ($close !== $b || count($inner) > $maxArgs) {
+                return null;
+            }
+            if ($maxArgs < 99 && count($inner) === $maxArgs && $maxArgs > 1 && strtolower($this->compact(...end($inner))) !== 'null') {
+                return null;
+            }
+            return ['conf' => 'sedang', 'kind' => 'source', 'source' => $text, 'label' => $label];
+        }
+        if ($a === $b && $this->id($a) === T_VARIABLE && $text !== '$this') {
+            return $this->nullableVariable($text, $before);
+        }
+        return null;
+    }
+
+    /** $var assigned a nullable value earlier in the same function and not checked before $before. */
+    private function nullableVariable(string $var, int $before): ?array
+    {
+        for ($k = $before - 1; $k > 0; $k--) {
+            $id = $this->id($k);
+            if ($id === T_FUNCTION || $id === T_FN) {
+                return null;
+            }
+            if ($id !== T_VARIABLE || $this->text($k) !== $var) {
+                continue;
+            }
+            $p = $this->id($k - 1);
+            $n = $this->id($k + 1);
+            // A check or a use that settles it: isset/empty/is_null, comparisons, ??, ?:, if ($var), casts.
+            if (in_array($n, [T_COALESCE, T_COALESCE_EQUAL, T_IS_IDENTICAL, T_IS_NOT_IDENTICAL, T_IS_EQUAL, T_IS_NOT_EQUAL, '?', T_BOOLEAN_AND, T_BOOLEAN_OR, T_LOGICAL_AND, T_LOGICAL_OR], true)
+                || in_array($p, [T_IS_IDENTICAL, T_IS_NOT_IDENTICAL, T_IS_EQUAL, T_IS_NOT_EQUAL, '!', T_BOOLEAN_AND, T_BOOLEAN_OR, '&', T_STRING_CAST, T_INT_CAST, T_DOUBLE_CAST, T_BOOL_CAST, T_ARRAY_CAST], true)
+                || ($p === '(' && in_array($this->id($k - 2), [T_ISSET, T_EMPTY, T_IF, T_ELSEIF, T_WHILE], true))
+                || ($p === '(' && $this->id($k - 2) === T_STRING && in_array(strtolower($this->text($k - 2)), ['is_null', 'is_string', 'is_numeric', 'is_array', 'strlen'], true))
+                || in_array($p, [T_AS, T_GLOBAL, T_STATIC], true)) {
+                return null;
+            }
+            if ($n === '=' && !in_array($p, [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR, T_DOUBLE_COLON, '$'], true)) {
+                $end = $k + 2;
+                $depth = 0;
+                for ($e = $k + 2; isset($this->sig[$e]); $e++) {
+                    $eid = $this->id($e);
+                    if (self::isOpen($eid)) { $depth++; }
+                    if (self::isClose($eid)) { $depth--; }
+                    if ($depth <= 0 && ($eid === ';' || ($depth < 0))) { break; }
+                    $end = $e;
+                }
+                $why = $this->nullableExpr($k + 2, $end, $k);
+                if ($why === null || $why['kind'] === 'variable') {
+                    return null;
+                }
+                return ['conf' => $why['conf'] === 'tinggi' ? 'sedang' : $why['conf'], 'kind' => 'variable', 'source' => $why['source'], 'via' => $var, 'via_line' => $this->sig[$k][2]] + (isset($why['label']) ? ['label' => $why['label']] : []);
+            }
+            if ($n === '=' || in_array($n, ['[', T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR, T_INC, T_DEC, T_PLUS_EQUAL, T_CONCAT_EQUAL, T_MINUS_EQUAL], true)) {
+                return null; // assigned or used as an array/object, so not a plain nullable value
+            }
+        }
+        return null;
+    }
+
     private function checkMethod(int $i): void
     {
         $name = strtolower($this->text($i));
         [$args, , $spread] = $this->parseArgs($i + 1);
+        if (isset($this->special['null_to_internal']) && !$spread && $this->id($i - 1) === T_DOUBLE_COLON && ($fq = $this->resolveClass($i - 2)) !== null) {
+            $this->checkNullArgs($i, $fq . '::' . $name, $args);
+        }
         foreach ($this->byKind['method'] ?? [] as $r) {
             // A generic name (->contains()) only counts in files that use the class at all.
             if (!$this->mentioned($r)) {

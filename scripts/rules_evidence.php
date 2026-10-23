@@ -134,6 +134,10 @@ return [
         ['kind' => 'php-src', 'title' => 'PHP 8.1 UPGRADING (php-src)', 'url' => 'https://github.com/php/php-src/blob/PHP-8.1/UPGRADING', 'quote' => 'The PDO::FETCH_SERIALIZE mode has been deprecated.'],
         ['kind' => 'rfc', 'title' => 'RFC: phase_out_serializable', 'url' => 'https://wiki.php.net/rfc/phase_out_serializable'],
     ],
+    'P81-NULL-TO-INTERNAL' => [
+        ['kind' => 'php-src', 'title' => 'PHP 8.1 UPGRADING (php-src)', 'url' => 'https://github.com/php/php-src/blob/PHP-8.1/UPGRADING', 'quote' => 'Passing null to a non-nullable argument of a built-in function is deprecated.'],
+        ['kind' => 'rfc', 'title' => 'RFC: deprecate_null_to_scalar_internal_arg', 'url' => 'https://wiki.php.net/rfc/deprecate_null_to_scalar_internal_arg'],
+    ],
     'P81-HTML-FLAGS' => [
         ['kind' => 'php-src', 'title' => 'PHP 8.1 UPGRADING (php-src)', 'url' => 'https://github.com/php/php-src/blob/PHP-8.1/UPGRADING', 'quote' => 'htmlspecialchars(), htmlentities(), htmlspecialchars_decode(), html_entity_decode() and get_html_translation_table() now use ENT_QUOTES | ENT_SUBSTITUTE rather than ENT_COMPAT by default.'],
     ],

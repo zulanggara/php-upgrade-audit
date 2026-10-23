@@ -40,6 +40,8 @@ return [
     'P81-DEPR-FUNC' => ['Function deprecated in PHP 8.1', 'strftime() -> date() or IntlDateFormatter; mhash*() -> hash*(); date_sunrise/sunset -> date_sun_info().'],
     'P81-DEPR-CONST' => ['Constant deprecated in PHP 8.1', 'FILTER_SANITIZE_STRING -> htmlspecialchars() on output, or FILTER_UNSAFE_RAW plus your own validation.'],
     'P81-PDO-FETCH-SERIALIZE' => ['PDO::FETCH_SERIALIZE deprecated', 'Fetch normally, then unserialize() yourself.'],
+    'P81-NULL-TO-INTERNAL' => ['null passed to a scalar parameter of a built-in function (json_decode, strtolower, trim, str_replace...): deprecated',
+        'Make sure the value is a string/int before the call: give a default (?? \'\'), cast ((string) $x), or skip the call when it is null. Common sources: a missing request/session/URI value, env()/config() without a default, a NULL database column. Database columns and return values of other functions cannot be seen statically: check the logs (audit.php --logs).'],
     'P81-HTML-FLAGS' => ['Default flags of htmlspecialchars() and friends are now ENT_QUOTES | ENT_SUBSTITUTE', 'Single quotes are now escaped as &#039;. Check output that is compared or stored, or pass the flags explicitly.'],
     'P81-MYSQLI-EXCEPTION' => ['mysqli throws exceptions by default (MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT)', 'Code that checks "if (!$result)" is never reached because the exception is thrown first. Add try/catch or mysqli_report(MYSQLI_REPORT_OFF).'],
     'P81-MYSQLI-EXCEPTION-OOP' => ['mysqli throws exceptions by default (MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT)', 'Code that checks "if (!$result)" is never reached because the exception is thrown first. Add try/catch or mysqli_report(MYSQLI_REPORT_OFF).'],
