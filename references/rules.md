@@ -24,6 +24,22 @@ After changing rules:
    and run `php -d error_reporting=-1 file.php`.
 4. Run the scanner on a real project that already supports PHP 8 to measure false positives.
 
+## Null passed to built-in functions (`P81-NULL-TO-INTERNAL`)
+
+- The parameter list is `scripts/null_params.php`: for every internal function, constructor (`new:class`) and
+  static method (`class::method`), the 0-based positions of scalar parameters that reject `null`. Regenerate it
+  on the newest PHP with the php-src stubs of that release (instructions at the top of
+  `tests/gen_null_params.php`); the scanner also adds what reflection finds on the PHP that runs it.
+- Sources of a possible `null` are listed in `nullableExpr()` in `scripts/scan_code.php`. Add one only when the
+  framework's own code or documentation says it returns `null` for a missing value, and add a `// FIND` line and
+  an `// ok` counterpart (with a default, a cast, a check) to `fixtures/null-args/`.
+- `tests/check_null_args.php` requires the findings to match the `// FIND` markers exactly: every marked line,
+  no line marked `// ok`, no unmarked line. Before adding a marker, run the line with a stand-in that returns
+  `null` on the target PHP (`php -d error_reporting=-1`) and check that it emits the deprecation.
+- Values from a database or another runtime source cannot be seen statically. Runtime logs cover them:
+  `scripts/scan_logs.php` maps log messages to rules in `log_rule()`; when a new rule has a runtime message, add
+  its pattern there, with the message copied from what the target PHP prints.
+
 ## Redaction
 
 `scripts/redact.php` hides secrets in everything the tools write and in the rendered report. When you add a

@@ -128,6 +128,7 @@ STORE=~/php-audit-store
 # 1. scan (run again later: a new version is added, nothing is overwritten)
 php $TOOL/scripts/audit.php /path/to/repo --out=$STORE --name=my-app --load-classes     # latest PHP; or --target=8.3.30
 #    no target PHP installed but Docker is: add --php=docker
+#    error logs of a run on the target PHP (e.g. copied from staging): add --logs=/path/to/logs (repeatable)
 
 # 2. optional: framework switch or merge
 php $TOOL/scripts/compare_framework.php --old=/path/old/system --new=/path/new/system --app=/path/to/repo \
@@ -193,6 +194,8 @@ summarises the findings per level.
 |---|---|
 | Removed, deprecated and behaviour-changing functions, syntax and helpers (PHP 7.1 → 8.5) | Tokenizer-based scanner, ~80 rules taken from the official php.net migration guides, filtered by the target |
 | Code guarded by version checks | `if (PHP_VERSION_ID < 80000)`, `is_php()`, `function_exists()`… are evaluated against the target, so dead legacy branches are not counted |
+| `null` passed to built-in functions (8.1) | `json_decode()`, `strtolower()`, `trim()`, `new DateTime()`… receiving request input, session data, URI segments, `env()` without a default, a superglobal read without `isset()`, `?? null`, or a variable assigned from one of those. Each finding says which argument and where the value comes from. The parameter list (1,400+ functions, constructors and static methods) is generated from PHP 8.5.12 |
+| Runtime logs (`--logs`) | CodeIgniter 3, Laravel/Monolog and PHP `error_log` files: deprecations, warnings and fatal errors grouped per message and file:line, mapped to the rules, marked when the scanner did not see them (typically a `NULL` from the database). Logs in `application/logs`, `storage/logs`, `var/log`, `logs` are read automatically |
 | Parse errors and compile-time deprecations | `php -l` on every file with the target PHP |
 | Classes that no longer load (`--load-classes`) | Every class of the app loaded on the target PHP in a scratch copy: signature conflicts (fatal since 8.0), missing parents, deprecations while linking. Composer autoload, or plain files for projects without Composer |
 | Composer libraries | `php` constraint of every package in `composer.lock` vs the target, abandoned packages, latest version in the same major, latest version supporting the target (Packagist) |
@@ -234,6 +237,10 @@ valid, and the changes already checked (bcrypt cost, php-jwt key size, Guzzle 7,
 - Analyst notes with **Current vs Suggested** code, which the agent must run on the target PHP before
   suggesting it, the output of that run, and the [evidence](#evidence) links. `validate_notes.php` checks
   their format. Only `http(s)` links are rendered.
+- Each finding line shows its own confidence where the rule sets one, and for `null` arguments which argument
+  can be null and where the value comes from (also in the SARIF message).
+- A **Runtime logs** section: what the error logs showed, grouped and linked to the rules, with "only in the
+  logs" for lines the scanner did not report, and a hint to pass `--logs` when no log was read.
 - The footer names the kit version that produced the report.
 - English or Indonesian (`--lang=en|id`), light and dark theme, phone layout.
 
@@ -250,7 +257,7 @@ The skill runs `scripts/update.sh` at the start of every audit, so an installed 
 By hand: `bash scripts/update.sh --force` (check now), `--check` (report only). Turn it off with
 `PHP_UPGRADE_AUDIT_NO_UPDATE=1` or `--offline`.
 
-Every version is tagged (`v1.2.0`) with its changelog on the
+Every version is tagged (`v1.3.0`) with its changelog on the
 [Releases](https://github.com/zulanggara/php-upgrade-audit/releases) page; the report footer shows which
 version and commit produced it.
 
@@ -260,6 +267,9 @@ version and commit produced it.
   `glpat-…`, AWS/Google/Stripe/Slack keys, JWTs, private keys, `user:password@` in URLs, `password => '…'`,
   `$secret = '…'`, `DB_PASSWORD=…`, long random literals). They show up as `«REDACTED»`.
 - Local absolute paths (home folders, temp folders, the store, this tool's folder) are removed from the report.
+- Runtime logs are read locally and never sent anywhere. Only the log's file name, the repo-relative location
+  and a normalised message are kept: changing values become `N` or `"…"`, e-mail addresses are hidden, and the
+  result is redacted like every other output.
 - Network during an audit: public package names to `repo.packagist.org` and `packagist.org` (metadata and
   security advisories; private packages are skipped), one request to `php.net` for the newest PHP release
   when no exact target is given, the official `php` image from Docker Hub with `--php=docker`, and, with

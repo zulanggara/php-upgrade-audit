@@ -73,12 +73,20 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
 1. **Audit each repo** (a new version is added to the history store every time):
    ```bash
    php ${CLAUDE_SKILL_DIR}/scripts/audit.php <repo> --out=<STORE> --name=<label> --target=<version> --load-classes \
-       [--php=<target php>|docker] [--exclude=tests,docs] [--skip=rector] [--memory=4G] [--offline] [--sarif=<file>]
+       [--php=<target php>|docker] [--exclude=tests,docs] [--skip=rector] [--memory=4G] [--offline] [--sarif=<file>] \
+       [--logs=<file|dir>]...
    ```
-   Result: `<STORE>/<name>/scans/<scan-id>/{profile,scan,lint,libs,runtime,phpcompat,rector,report}.json`. On a
+   Result: `<STORE>/<name>/scans/<scan-id>/{profile,scan,lint,libs,runtime,logs,phpcompat,rector,report}.json`. On a
    re-scan the previous notes are copied in with `carried_from` set. `php scripts/audit.php --help` lists
    every option. Drop `--load-classes` only when the user wants a quick scan; it installs the locked
    packages in a scratch copy (network) and takes longer.
+
+   **Runtime logs.** Logs inside the repo (`application/logs`, `storage/logs`, `var/log`, `logs`) are read
+   automatically. Ask the user whether the app has already run on the target PHP (staging, a test server, CI)
+   and, if so, for its error log (CodeIgniter `log-*.php`, Laravel `storage/logs/*.log`, the PHP or php-fpm
+   `error_log`), then pass it with `--logs=<file|dir>`. A `NULL` from a database column passed to
+   `strtolower()` or `json_decode()` is only visible there. Logs written by the old PHP do not contain the new
+   deprecations; say so instead of concluding that the logs are clean.
 
 2. **Find the PHP version in production** if the repo does not say it (Dockerfile `FROM`, CI config, base
    image metadata; `profile.json` lists the hints found). Write it in the overview.
@@ -93,6 +101,15 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
    - `runtime.json`: `failed` are real problems on the target PHP (signature conflicts are fatal since PHP
      8.0); `unresolved` means a parent is not in the repo or not installed (e.g. WordPress core classes), which
      is not a PHP problem by itself; `skipped` files run code when included and were not loaded.
+   - `P81-NULL-TO-INTERNAL` findings carry `detail` (`func`, `param`, `kind`, `source`, `via`/`via_line` for a
+     value that comes through a variable) and their own `conf`: `tinggi` for a literal `null` or `?? null`,
+     `sedang` for request/session/env values, `rendah` for a superglobal without `isset()`. Read the code: a
+     check earlier in the function or a framework default can make the value non-null.
+   - `logs.json`: `entries` grouped per message and file:line, with `level` (fatal, deprecated, warning),
+     the `rule` that covers it, `count` and `last_seen`. `in_scan: false` on an entry inside the repo means
+     the scanner did not see it: write a note for it (the location and count are its evidence; quote the log
+     message). `in_repo: false` entries are in vendor or framework code: point to the package or framework
+     upgrade instead.
    - Cross-check `phpcompat.json`; anything only PHPCompatibility found still has to be checked.
    - Prove doubtful behaviour by running a small snippet on the target PHP.
    - Vendor packages: `scripts/load_classes.php <repo> --vendor-only [--packages=a/b]` loads their classes.
@@ -183,6 +200,7 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
 | `scripts/detect.php` | Framework, PHP version hints, minified files, non-Composer libraries |
 | `scripts/scan_code.php` | Tokenizer scanner; rules in `scripts/rules.php` (+ `rules_en.php`, sources in `rules_evidence.php`) |
 | `scripts/lint.php` | `php -l` on every file with the target PHP |
+| `scripts/scan_logs.php` | Runtime error logs (CodeIgniter 3, Laravel/Monolog, PHP error_log) grouped and mapped to the rules (also `audit.php --logs`) |
 | `scripts/check_libs.php` | Composer libraries vs target, abandoned packages, security advisories, Packagist suggestions, removed extensions |
 | `scripts/load_classes.php` | Runtime proof: load every app (or vendor) class on the target PHP |
 | `scripts/run_tools.php` | PHPCompatibility + Rector dry-run |

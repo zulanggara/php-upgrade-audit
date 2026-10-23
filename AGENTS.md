@@ -60,17 +60,25 @@ must then say which PHP ran the proof.
 ## Steps
 
 1. **Scan** each repo (adds a version to the store):
-   `php <TOOL>/scripts/audit.php <repo> --out=<STORE> --name=<name> [--target=<version>] --load-classes [--php=<binary>|docker] [--exclude=tests] [--sarif=<file>]`
+   `php <TOOL>/scripts/audit.php <repo> --out=<STORE> --name=<name> [--target=<version>] --load-classes [--php=<binary>|docker] [--exclude=tests] [--sarif=<file>] [--logs=<file|dir>]...`
    (`php <TOOL>/scripts/audit.php --help` lists every option.)
+   **Runtime logs:** logs inside the repo (`application/logs`, `storage/logs`, `var/log`, `logs`) are read
+   automatically. Ask the user whether the app already ran on the target PHP (staging, tests, CI) and for that
+   error log (CodeIgniter `log-*.php`, Laravel `storage/logs/*.log`, PHP/php-fpm `error_log`); pass it with
+   `--logs`. A `NULL` that comes from the database is only visible there. Logs of the old PHP cannot show the
+   new deprecations: say so rather than calling them clean.
 2. **Find the production PHP version** if the repo does not state it (Dockerfile, CI, base image;
    `profile.json` lists the hints found).
 3. **Review** `<STORE>/<name>/scans/<id>/`: `report.json` (all tools combined), `scan.json`, `lint.json`,
-   `runtime.json`, `libs.json`, `phpcompat.json`, `rector.json`. Order: must-fix (`wajib`), lint errors and
+   `runtime.json`, `logs.json`, `libs.json`, `phpcompat.json`, `rector.json`. Order: must-fix (`wajib`), lint errors and
    classes that fail to load → libraries and their security `advisories` → deprecated → behaviour changes
    (`perilaku`). Read the code around
    low/medium confidence findings and drop false positives. `guard_state`: `mati` = does not run on the target,
    `jalan` = runs, `?` = check by hand. In `runtime.json`, `unresolved` (a parent not in the repo or not
-   installed) is not a PHP problem by itself; `failed` is.
+   installed) is not a PHP problem by itself; `failed` is. `P81-NULL-TO-INTERNAL` findings have a `detail`
+   (which argument, where the value comes from, `via`/`via_line`) and their own `conf`. In `logs.json`, an
+   entry with `in_repo: true` and `in_scan: false` is something only the logs show: write a note for it, citing
+   the log message, location and count.
 4. **Framework switch/merge** (optional):
    `php <TOOL>/scripts/compare_framework.php --old=<old> --new=<new> --app=<repo> [--official=<release>] [--new-config=<dir>] [--app-config=<dir>] --name="<name>" --store=<STORE>`
    Framework adapters live in `scripts/adapters/` (CodeIgniter 3 bundled, detected automatically).

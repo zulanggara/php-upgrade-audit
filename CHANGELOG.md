@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.3.0 (2026-10-23)
+
+The audit now finds `null` passed to built-in functions (deprecated since PHP 8.1), and reads runtime error
+logs for what static analysis cannot see, such as a `NULL` from a database column.
+
+### Added
+
+- Rule `P81-NULL-TO-INTERNAL`: `json_decode()`, `strtolower()`, `trim()`, `new DateTime()`,
+  `DateTime::createFromFormat()`… receiving a literal `null`, `?? null`, request input, session data, URI
+  segments, `env()` without a default, a superglobal read without `isset()`, or a variable assigned from one of
+  those and not checked before the call. The parameter list (`scripts/null_params.php`: 1,424 functions, 141
+  constructors, 168 static methods) is generated from PHP 8.5.12 and its php-src stubs
+  (`tests/gen_null_params.php`). Each finding has its own confidence and a `detail`: which argument, where the
+  value comes from, and the variable and line it went through.
+- The report shows that detail and confidence on every finding line ("argument 1 of json_decode() can be null:
+  $this->input->post('payload') (CodeIgniter input)"), the confidence column counts findings per level, and the
+  search box matches the detail. SARIF messages start with the same sentence and carry
+  `properties.confidence`.
+- Runtime logs: `scripts/scan_logs.php` and `audit.php --logs=<file|dir>` (repeatable). Reads CodeIgniter 3,
+  Laravel/Monolog and PHP `error_log` / php-fpm logs, read-only, at most 50 MB in total (newest files first,
+  each from its end). Keeps deprecations, warnings and fatal errors; groups them per normalised message and per
+  file:line in the repo (container paths are matched to repo files); maps them to scanner rules; marks the ones
+  the scanner did not report. Logs in `application/logs`, `storage/logs`, `var/log` and `logs` are read
+  automatically; `--skip=logs` turns it off. `logs.json` is part of every scan, counted in the summary, shown in
+  a "Runtime logs" section of the report, and redacted.
+- SKILL.md and AGENTS.md: ask for the error log of a run on the target PHP and pass it with `--logs`, and how to
+  review `logs.json` and the null-argument detail.
+
+### Changed
+
+- Files named `log-YYYY-MM-DD.php` (CodeIgniter's log files) are no longer scanned or linted as code.
+- English reports translate the confidence levels (high, medium, low).
+
 ## 1.2.0 (2026-10-23)
 
 The default target follows the newest PHP release, every rule cites php-src, and libraries are checked for

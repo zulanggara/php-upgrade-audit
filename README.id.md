@@ -130,6 +130,7 @@ STORE=~/php-audit-store
 # 1. scan (jalankan lagi nanti: versi baru ditambahkan, tidak ada yang ditimpa)
 php $TOOL/scripts/audit.php /path/ke/repo --out=$STORE --name=aplikasi-saya --load-classes   # PHP terbaru; atau --target=8.3.30
 #    PHP target belum terpasang tapi ada Docker: tambahkan --php=docker
+#    log error dari aplikasi yang sudah jalan di PHP target (mis. disalin dari staging): tambahkan --logs=/path/ke/log (boleh berulang)
 
 # 2. opsional: ganti atau merge framework
 php $TOOL/scripts/compare_framework.php --old=/path/lama/system --new=/path/baru/system --app=/path/ke/repo \
@@ -195,6 +196,8 @@ merangkum jumlah temuan per tingkat.
 |---|---|
 | Fungsi, syntax, dan helper yang dihapus, deprecated, atau berubah perilaku (PHP 7.1 → 8.5) | Scanner berbasis tokenizer, sekitar 80 aturan dari panduan migrasi resmi php.net, difilter sesuai target |
 | Kode yang dijaga pengecekan versi | `if (PHP_VERSION_ID < 80000)`, `is_php()`, `function_exists()`, dan sejenisnya dievaluasi terhadap versi target, jadi cabang lama yang tidak dijalankan tidak dihitung |
+| `null` yang dikirim ke fungsi bawaan (8.1) | `json_decode()`, `strtolower()`, `trim()`, `new DateTime()`… yang menerima input request, data session, segmen URI, `env()` tanpa default, superglobal yang dibaca tanpa `isset()`, `?? null`, atau variabel yang diisi dari salah satunya. Setiap temuan menyebut argumen ke berapa dan dari mana nilainya. Daftar parameternya (1.400+ fungsi, constructor, dan static method) dibangkitkan dari PHP 8.5.12 |
+| Log runtime (`--logs`) | File log CodeIgniter 3, Laravel/Monolog, dan PHP `error_log`: deprecation, warning, dan fatal error dikelompokkan per pesan dan file:baris, dipetakan ke aturan, dan ditandai bila scanner tidak melihatnya (biasanya `NULL` dari database). Log di `application/logs`, `storage/logs`, `var/log`, `logs` dibaca otomatis |
 | Parse error dan deprecation saat kompilasi | `php -l` ke semua file dengan PHP target |
 | Class yang tidak bisa dimuat lagi (`--load-classes`) | Setiap class aplikasi dimuat di PHP target pada salinan sementara: konflik signature (fatal sejak 8.0), class induk yang hilang, deprecation saat class di-link. Lewat autoload Composer, atau file biasa untuk proyek tanpa Composer |
 | Library Composer | Constraint `php` setiap package di `composer.lock` vs target, package abandoned, versi terbaru di major yang sama, versi terbaru yang mendukung target (Packagist) |
@@ -236,6 +239,10 @@ link tetap valid, dan perubahan yang sudah diverifikasi (cost bcrypt, ukuran kun
 - Catatan analis dengan perbandingan kode **Saat ini vs Disarankan**, yang wajib diuji agent di PHP target
   sebelum disarankan, hasil uji jalannya, dan link [bukti](#bukti-evidence). `validate_notes.php` memeriksa
   formatnya. Hanya link `http(s)` yang ditampilkan.
+- Setiap baris temuan menampilkan tingkat keyakinannya sendiri bila aturannya menyediakan, dan untuk argumen
+  `null` menyebut argumen mana yang bisa null dan dari mana nilainya (juga di pesan SARIF).
+- Bagian **Log runtime**: isi log error, dikelompokkan dan ditautkan ke aturan, dengan tanda "hanya di log"
+  untuk baris yang tidak dilaporkan scanner, serta petunjuk memakai `--logs` bila belum ada log yang dibaca.
 - Footer menyebut versi kit yang membuat laporan.
 - Bahasa Inggris atau Indonesia (`--lang=en|id`), tema terang dan gelap, tampilan ponsel.
 
@@ -252,7 +259,7 @@ Skill menjalankan `scripts/update.sh` setiap kali audit dimulai, jadi salinan ya
 Manual: `bash scripts/update.sh --force` (cek sekarang), `--check` (hanya melaporkan). Matikan dengan
 `PHP_UPGRADE_AUDIT_NO_UPDATE=1` atau `--offline`.
 
-Setiap versi diberi tag (`v1.2.0`) beserta changelog-nya di halaman
+Setiap versi diberi tag (`v1.3.0`) beserta changelog-nya di halaman
 [Releases](https://github.com/zulanggara/php-upgrade-audit/releases); footer laporan menampilkan versi dan
 commit yang menghasilkannya.
 
@@ -262,6 +269,9 @@ commit yang menghasilkannya.
   `glpat-…`, key AWS/Google/Stripe/Slack, JWT, private key, `user:password@` di URL, `password => '…'`,
   `$secret = '…'`, `DB_PASSWORD=…`, dan literal acak yang panjang. Semuanya tampil sebagai `«REDACTED»`.
 - Path absolut lokal (folder home, folder sementara, store, folder tool ini) dibuang dari laporan.
+- Log runtime dibaca di mesin sendiri dan tidak dikirim ke mana pun. Yang disimpan hanya nama file log, lokasi
+  relatif terhadap repo, dan pesan yang dinormalisasi: nilai yang berubah-ubah menjadi `N` atau `"…"`, alamat
+  email disembunyikan, dan hasilnya disensor seperti output lain.
 - Akses jaringan saat audit: nama package publik ke `repo.packagist.org` dan `packagist.org` (metadata dan
   security advisory; package privat dilewati), satu request ke `php.net` untuk rilis PHP terbaru bila target
   tidak disebut persis, image resmi `php` dari Docker Hub dengan `--php=docker`, dan dengan `--load-classes`,
