@@ -243,7 +243,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       lintSum: (p, e, d, f) => `Proof from PHP ${p} (php -l): ${e} error(s), ${d} deprecation(s) in ${f} files`, lintFail: 'Lint failed to run.', noLintErr: 'No parse or fatal errors.', parseErr: 'Parse / fatal errors', compileDep: 'Compile-time deprecations',
       pcSum: (v, n, k) => `PHPCompatibility (testVersion ${v}): ${n} message(s), ${k} kind(s)`, pcFail: 'PHPCompatibility: failed to run', sniff: 'Sniff', type: 'Type', example: 'Example', noMsg: 'No messages.',
       rcSum: (s, n) => `Rector ${s} (dry-run): ${n} file(s) can be changed automatically`, rcFail: 'Rector: failed to run', rcNote: 'This set also contains optional modernisation, e.g. array() to []. Not every change is required for compatibility.', rcRule: 'Rector rule', noChange: 'No changes.',
-      current: 'Current', evidence: 'Evidence', evKind: { 'php.net': 'php.net', rfc: 'RFC', 'php-src': 'php-src', changelog: 'Changelog', release: 'Release', upgrade: 'Upgrade guide', source: 'Source code', issue: 'Issue / PR', cve: 'CVE', advisory: 'Advisory', docs: 'Docs', run: 'Run' }, unsafeLink: 'link removed: not an http(s) address', proofOn: (p, r) => `Verified on PHP ${p}${r ? ': ' + r : ''}`, evRule: 'Sources', suggested: 'Suggested',
+      current: 'Current', libLink: { packagist: 'Packagist', source: 'Repo', release: 'Release' }, libNotesTitle: (n) => `Upgrade notes for these packages (${n})`, libNotesCount: (n) => `${n} upgrade note(s)`, libNoteWhen: (p, v, to) => `${p} ${v}: applies when upgrading to ${to} or later`, provenBy: 'Checked', evidence: 'Evidence', evKind: { 'php.net': 'php.net', rfc: 'RFC', 'php-src': 'php-src', changelog: 'Changelog', release: 'Release', upgrade: 'Upgrade guide', source: 'Source code', issue: 'Issue / PR', cve: 'CVE', advisory: 'Advisory', docs: 'Docs', run: 'Run' }, unsafeLink: 'link removed: not an http(s) address', proofOn: (p, r) => `Verified on PHP ${p}${r ? ': ' + r : ''}`, evRule: 'Sources', suggested: 'Suggested',
       cmpLead: (o, of, n, nf, a) => `<span class="mono">${o}</span> (${of} files) → <span class="mono">${n}</span> (${nf} files), tested against <span class="mono">${a}</span>.`,
       overrideConflicts: 'Override conflicts in the application', apiUsage: 'Uses of removed or changed API', localPatched: 'Locally patched framework files', filesChanged: (c, a, r) => `Files changed · ${a} added · ${r} removed`,
       cmpTable: (t, o, n) => `PHP ${t} findings: ${o} vs ${n}`, cmpTableLead: (t) => `Counts exclude code proven not to run on ${t}.`, parseErrRow: 'Parse errors (php -l)', compileDepRow: 'Compile-time deprecations', deadRow: (t) => `Guarded code not run on ${t}`,
@@ -290,7 +290,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       lintSum: (p, e, d, f) => `Bukti dari PHP ${p} (php -l): ${e} error, ${d} deprecation dari ${f} file`, lintFail: 'Lint gagal dijalankan.', noLintErr: 'Tidak ada parse error atau fatal error.', parseErr: 'Parse / fatal error', compileDep: 'Deprecation saat kompilasi',
       pcSum: (v, n, k) => `PHPCompatibility (testVersion ${v}): ${n} pesan, ${k} jenis`, pcFail: 'PHPCompatibility: gagal dijalankan', sniff: 'Sniff', type: 'Tipe', example: 'Contoh', noMsg: 'Tidak ada pesan.',
       rcSum: (s, n) => `Rector ${s} (dry-run): ${n} file bisa diubah otomatis`, rcFail: 'Rector: gagal dijalankan', rcNote: 'Set ini juga berisi modernisasi opsional, misalnya array() menjadi []. Tidak semua perubahan wajib untuk kompatibilitas.', rcRule: 'Aturan Rector', noChange: 'Tidak ada perubahan.',
-      current: 'Saat ini', evidence: 'Bukti', evKind: { 'php.net': 'php.net', rfc: 'RFC', 'php-src': 'php-src', changelog: 'Changelog', release: 'Rilis', upgrade: 'Panduan upgrade', source: 'Kode sumber', issue: 'Issue / PR', cve: 'CVE', advisory: 'Advisory', docs: 'Dokumentasi', run: 'Uji jalan' }, unsafeLink: 'link dibuang: bukan alamat http(s)', proofOn: (p, r) => `Diuji di PHP ${p}${r ? ': ' + r : ''}`, evRule: 'Sumber', suggested: 'Disarankan',
+      current: 'Saat ini', libLink: { packagist: 'Packagist', source: 'Repo', release: 'Rilis' }, libNotesTitle: (n) => `Catatan upgrade untuk package ini (${n})`, libNotesCount: (n) => `${n} catatan upgrade`, libNoteWhen: (p, v, to) => `${p} ${v}: berlaku saat upgrade ke ${to} atau lebih baru`, provenBy: 'Diuji', evidence: 'Bukti', evKind: { 'php.net': 'php.net', rfc: 'RFC', 'php-src': 'php-src', changelog: 'Changelog', release: 'Rilis', upgrade: 'Panduan upgrade', source: 'Kode sumber', issue: 'Issue / PR', cve: 'CVE', advisory: 'Advisory', docs: 'Dokumentasi', run: 'Uji jalan' }, unsafeLink: 'link dibuang: bukan alamat http(s)', proofOn: (p, r) => `Diuji di PHP ${p}${r ? ': ' + r : ''}`, evRule: 'Sumber', suggested: 'Disarankan',
       cmpLead: (o, of, n, nf, a) => `<span class="mono">${o}</span> (${of} file) → <span class="mono">${n}</span> (${nf} file), diuji terhadap aplikasi <span class="mono">${a}</span>.`,
       overrideConflicts: 'Konflik override di aplikasi', apiUsage: 'Pemakaian API yang hilang/berubah', localPatched: 'File framework dipatch lokal', filesChanged: (c, a, r) => `File berubah · ${a} baru · ${r} dihapus`,
       cmpTable: (t, o, n) => `Temuan PHP ${t}: ${o} vs ${n}`, cmpTableLead: (t) => `Hitungan tidak termasuk kode yang terbukti tidak dijalankan di ${t}.`, parseErrRow: 'Parse error (php -l)', compileDepRow: 'Deprecation saat kompilasi', deadRow: (t) => `Kode dijaga, mati di ${t}`,
@@ -598,7 +598,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
         <dt>${esc(T.thirdParty)}</dt><dd>${tp}</dd>
         <dt>${esc(T.git)}</dt><dd>${git}</dd>
       </dl></section>
-      <section><h3>${esc(T.libTitle)}</h3>${libRootHtml(r.libs)}${libTableHtml(r.libs)}${extHtml(r.libs)}</section>
+      <section><h3>${esc(T.libTitle)}</h3>${libRootHtml(r.libs)}${libTableHtml(r.libs)}${libNotesHtml(r.libs)}${extHtml(r.libs)}</section>
       <section>
         <h3>${esc(T.findings)}</h3><p class="lead">${T.findingsLead}</p>
         <div class="toolbar">
@@ -633,10 +633,23 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
         (p.risk || []).forEach((x) => notes.push(`<span class="tag">${esc(x)}</span>`));
         if (p.dev) notes.push(`<span class="tag">${esc(T.dev)}</span>`);
         if (p.bundled_in) notes.push(`<span class="tag">${esc(T.bundledIn(p.bundled_in))}</span>`);
+        const L = p.links || {};
+        ['packagist', 'source', 'release'].forEach((k) => { if (safeUrl(L[k])) notes.push(`<a class="tag" href="${esc(L[k])}" target="_blank" rel="noopener noreferrer">${esc(T.libLink[k])}</a>`); });
+        if ((p.upgrade_notes || []).length) notes.push(`<span class="tag">${esc(T.libNotesCount(p.upgrade_notes.length))}</span>`);
         return `<tr><td class="mono">${esc(p.name)}</td><td class="mono">${esc(p.version || p.constraint || '-')}<div class="sub">${esc(p.released || '')}</div></td>
           <td class="mono">${esc(p.php || '-')}</td><td><span class="pill ${LIB_CLASS[p.status] || 's-info'}">${esc(T.lib[p.status] || p.status)}</span></td>
           <td>${sug(s.latest_same_major)}</td><td>${sug(s.latest_compatible)}</td><td>${notes.join('')}</td></tr>`;
       }).join('') + '</tbody></table></div>';
+  }
+  function libNotesHtml(libs) {
+    const rows = ((libs && libs.packages) || []).flatMap((p) => (p.upgrade_notes || []).map((n) => ({ p, n })));
+    if (!rows.length) return '';
+    return `<details class="block" open><summary>${esc(T.libNotesTitle(rows.length))}</summary><div class="notes">` + rows.map(({ p, n }) => {
+      const [title, body] = n[LANG] || n.en || ['', ''];
+      return `<div class="note"><div class="note-head">${pill(n.sev || 'info')}<h3>${esc(title)}</h3></div>
+        <p class="sub mono">${esc(T.libNoteWhen(p.name, p.version, n.to))}</p><p>${esc(body)}</p>
+        ${n.proof ? `<p class="sub"><b>${esc(T.provenBy)}:</b> ${esc(typeof n.proof === 'string' ? n.proof : (n.proof[LANG] || n.proof.en || ''))}</p>` : ''}${evidenceHtml(n.evidence)}</div>`;
+    }).join('') + '</div></details>';
   }
   function extHtml(libs) {
     const ex = (libs && libs.extensions) || [];

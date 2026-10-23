@@ -133,6 +133,19 @@ JSON
   $want = ["acme/modern" => "aman", "acme/ancient" => "cek-manual", "acme/old-only" => "tidak-didukung"];
   if ($s !== $want) { fwrite(STDERR, json_encode($s) . "\n"); exit(1); }' "$TMP/libs.json" || fail "library statuses are wrong"
   echo "library status: ok"
+
+  # Upgrade notes with sources for known breaking changes (the fixture has php-jwt 5, guzzle 6, monolog 1)
+  php "$DIR/scripts/check_libs.php" "$DIR/fixtures/legacy-app" --offline > "$TMP/notes-libs.json"
+  php -r '
+  $n = [];
+  foreach (json_decode(file_get_contents($argv[1]), true)["packages"] as $p) {
+      foreach ($p["upgrade_notes"] ?? [] as $u) { $n[$p["name"]][] = $u["to"]; foreach ($u["evidence"] as $e) { if (!str_starts_with($e["url"], "https://")) exit(2); } }
+  }
+  $want = ["guzzlehttp/guzzle" => ["7.0.0"], "monolog/monolog" => ["2.0.0", "3.0.0"], "firebase/php-jwt" => ["7.0.0"]];
+  if ($n !== $want) { fwrite(STDERR, json_encode($n) . "\n"); exit(1); }' "$TMP/notes-libs.json" || fail "library upgrade notes are wrong"
+  grep -q '"packagist": "https://packagist.org/packages/firebase/php-jwt"' "$TMP/notes-libs.json" || fail "Packagist link missing"
+  php -r 'foreach (require $argv[1] as $n) { foreach (["package", "from", "to", "sev", "en", "id", "evidence"] as $k) { if (!isset($n[$k])) { fwrite(STDERR, "library_notes.php: $k missing\n"); exit(1); } } }' "$DIR/scripts/library_notes.php" || fail "library_notes.php entry incomplete"
+  echo "library notes: ok"
 fi
 
 # PHPCompatibility must find its standard even when Composer skipped its plugins (root, CI, --no-plugins)

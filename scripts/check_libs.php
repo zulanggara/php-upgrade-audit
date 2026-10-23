@@ -182,6 +182,7 @@ function packageRow(array $p, bool $dev, string $target, bool $offline, string $
     if (!$fromPackagist) {
         $row['risk'][] = 'package privat/non-Packagist: cek versi terbaru di repo internal';
     }
+    $meta = null;
     if ($fromPackagist && !$offline && ($row['satisfies'] !== true || $row['risk'] !== [])) {
         $meta = packagistVersions($name, $cacheDir, $errors);
         if ($meta !== null) {
@@ -190,7 +191,47 @@ function packageRow(array $p, bool $dev, string $target, bool $offline, string $
         }
     }
     $row['status'] = status($row);
+    $row['links'] = packageLinks($p, $fromPackagist, $row['suggest'], $meta);
+    $row['upgrade_notes'] = upgradeNotes($name, (string) $p['version']);
     return $row;
+}
+
+/**
+ * Where to check a package: Packagist page, source repository and the release page of the suggested version.
+ * Public hosts only; a private package's repository URL is never put in the report.
+ */
+function packageLinks(array $p, bool $fromPackagist, ?array $suggest, ?array $meta): array
+{
+    if (!$fromPackagist) {
+        return [];
+    }
+    $links = ['packagist' => 'https://packagist.org/packages/' . $p['name']];
+    $latest = $meta === null ? [] : (end($meta['versions']) ?: []);
+    $url = (string) ($p['source']['url'] ?? $p['support']['source'] ?? $latest['source']['url'] ?? '');
+    $url = (string) preg_replace(['#^git@([^:]+):#', '#\.git$#'], ['https://$1/', ''], $url);
+    if (preg_match('#^https://(github\.com|gitlab\.com|bitbucket\.org)/[\w.-]+/[\w.-]+#', $url, $m)) {
+        $links['source'] = $m[0];
+        $v = $suggest['latest_compatible']['version'] ?? null;
+        if ($v !== null && $m[1] === 'github.com') {
+            $links['release'] = $m[0] . '/releases/tag/' . rawurlencode($v);
+        }
+    }
+    return $links;
+}
+
+/** Entries of library_notes.php whose "from" constraint matches the installed version. */
+function upgradeNotes(string $name, string $version): array
+{
+    static $catalogue = null;
+    $catalogue ??= require __DIR__ . '/library_notes.php';
+    $out = [];
+    foreach ($catalogue as $n) {
+        if ($n['package'] === $name && safeSatisfies(ltrim($version, 'vV'), $n['from']) === true) {
+            unset($n['package']);
+            $out[] = $n;
+        }
+    }
+    return $out;
 }
 
 function safeSatisfies(string $version, string $constraint): ?bool
