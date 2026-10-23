@@ -237,7 +237,7 @@ if (realpath($argv[0] ?? '') === __FILE__) {
 
     Usage:
       php scripts/validate_notes.php --store=<store> [--json]     every notes.json + overview.json in the store
-      php scripts/validate_notes.php <file.json>... [--json]      single files (overview.json is detected by name)
+      php scripts/validate_notes.php <file.json>... [--json]      single files (overview*.json is checked as an overview)
 
     Checks: valid JSON, known keys, sev/status level values, title and body present, every code pair has both
     "before" and "after", no secrets, and no "carried_from" left on the latest scan (notes copied from the
@@ -264,7 +264,7 @@ if (realpath($argv[0] ?? '') === __FILE__) {
         $doc = json_decode((string) file_get_contents($f), true);
         $result[$f] = $doc === null && json_last_error() !== JSON_ERROR_NONE
             ? [['level' => 'error', 'where' => '(file)', 'message' => 'invalid JSON: ' . json_last_error_msg()]]
-            : validate_document($doc, basename($f) === 'overview.json' ? 'overview' : 'notes');
+            : validate_document($doc, str_starts_with(basename($f), 'overview') ? 'overview' : 'notes');
     }
     $errors = 0;
     foreach ($result as $problems) {
