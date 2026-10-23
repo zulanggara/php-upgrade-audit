@@ -1,0 +1,81 @@
+{
+  "status": {
+    "level": "wajib",
+    "label": "Belum siap: 1 fatal error di log"
+  },
+  "summary": "Scanner kode hampir tidak menemukan apa pun di sini: nilainya berasal dari baris database. Log error dari aplikasi yang berjalan di PHP 8.5.12 menunjukkan yang tidak terlihat itu: TypeError yang menghentikan request di Report::show(), NULL yang dikirim ke json_decode() dan strtolower(), serta dua deprecation yang juga dilaporkan scanner. Entri di system/ dan vendor/ milik framework dan sebuah package.",
+  "notes": [
+    {
+      "sev": "wajib",
+      "title": "Report::show() berhenti dengan TypeError saat status berupa array",
+      "body": "Log Laravel berisi \"strtolower(): Argument #1 ($string) must be of type string, array given\" di app/Http/Controllers/Report.php:8. PHP 7 hanya memberi warning dan mengembalikan NULL; sejak PHP 8.0 argumen bertipe salah ke fungsi bawaan melempar error, sehingga request gagal. Baris yang sama juga menerima NULL (2 deprecation di log) dan key yang tidak ada (warning). Terima hanya string.",
+      "files": [
+        "app/Http/Controllers/Report.php:8"
+      ],
+      "code": [
+        {
+          "where": "app/Http/Controllers/Report.php:8",
+          "before": "return strtolower($row['status']);",
+          "after": "return is_string($row['status'] ?? null) ? strtolower($row['status']) : '';",
+          "proof": {
+            "php": "8.5.12",
+            "run": "is_string($row['status'] ?? null) ? strtolower($row['status']) : '' for 'PAID', NULL, ['x'] and a missing key",
+            "output": "'paid', '', '', '' with no warning, deprecation or TypeError"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "rfc",
+          "title": "RFC: Consistent type errors for internal functions (PHP 8.0)",
+          "url": "https://wiki.php.net/rfc/consistent_type_errors",
+          "quote": "This RFC proposes to consistently generate TypeError exceptions for all invalid parameter types, regardless of whether the function is user-defined or extension-defined."
+        },
+        {
+          "kind": "php-src",
+          "title": "PHP 8.1 UPGRADING (php-src)",
+          "url": "https://github.com/php/php-src/blob/PHP-8.1/UPGRADING",
+          "quote": "Passing null to a non-nullable argument of a built-in function is deprecated."
+        }
+      ]
+    },
+    {
+      "sev": "deprecated",
+      "title": "json_decode() menerima NULL dari kolom settings (hanya di log)",
+      "body": "Log CodeIgniter mencatat deprecation ini dua kali di application/libraries/Local.php:7; scanner tidak melaporkannya karena nilainya dari baris database. Default '' mempertahankan hasil persis seperti sekarang (NULL, dengan json_last_error() 4) tanpa deprecation, yang akan menjadi TypeError di PHP 9.",
+      "files": [
+        "application/libraries/Local.php:7"
+      ],
+      "code": [
+        {
+          "where": "application/libraries/Local.php:7",
+          "before": "return json_decode($row['settings'], true);",
+          "after": "return json_decode($row['settings'] ?? '', true);",
+          "proof": {
+            "php": "8.5.12",
+            "run": "json_decode($row['settings'] ?? '', true) for a NULL, a JSON string and a missing column; json_decode(null, true) as the baseline",
+            "output": "NULL / ['a' => 1] / NULL, json_last_error() 4 for '' as for null; only the baseline prints \"json_decode(): Passing null to parameter #1 ($json) of type string is deprecated\""
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "php-src",
+          "title": "PHP 8.1 UPGRADING (php-src)",
+          "url": "https://github.com/php/php-src/blob/PHP-8.1/UPGRADING",
+          "quote": "Passing null to a non-nullable argument of a built-in function is deprecated."
+        },
+        {
+          "kind": "rfc",
+          "title": "RFC: deprecate_null_to_scalar_internal_arg",
+          "url": "https://wiki.php.net/rfc/deprecate_null_to_scalar_internal_arg"
+        }
+      ]
+    },
+    {
+      "sev": "info",
+      "title": "Entri di system/ dan vendor/ bukan kode aplikasi ini",
+      "body": "system/core/Loader.php (each() dihapus di PHP 8.0) dan system/core/Input.php milik folder system CodeIgniter; vendor/acme/lib milik sebuah package. Perbaikannya lewat upgrade framework atau package, bukan di aplikasi. Pastikan log memang berasal dari PHP 8.5.12: log dari PHP lama tidak mungkin berisi deprecation baru."
+    }
+  ]
+}

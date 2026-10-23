@@ -18,7 +18,7 @@
       },
       {
         "k": "Repos",
-        "v": "legacy-app, composer-app (bundled fixtures)"
+        "v": "legacy-app, composer-app, null-args, logs-app (bundled fixtures)"
       },
       {
         "k": "Not covered",
@@ -33,6 +33,7 @@
     "Replace mcrypt with openssl or sodium; verify old data still decrypts.",
     "Upgrade or replace the libraries marked Not supported / Upgrade.",
     "Run Rector for the deprecations (implicit nullable, (integer)), then re-scan: a new version is added and the report shows what was resolved.",
+    "For values from the database, read the error log of a run on PHP 8.5.12 (audit.php --logs): logs-app shows a fatal error and NULL arguments that only the logs reveal.",
     "Run the test suite on PHP 8.5.12 with error_reporting(E_ALL) before switching production."
   ],
   "notes": [

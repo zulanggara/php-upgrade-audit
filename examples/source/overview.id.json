@@ -18,7 +18,7 @@
       },
       {
         "k": "Repo",
-        "v": "legacy-app, composer-app (fixture bawaan)"
+        "v": "legacy-app, composer-app, null-args, logs-app (fixture bawaan)"
       },
       {
         "k": "Tidak dicakup",
@@ -33,6 +33,7 @@
     "Ganti mcrypt dengan openssl atau sodium; pastikan data lama tetap bisa didekripsi.",
     "Upgrade atau ganti library yang berstatus Tidak didukung / Perlu upgrade.",
     "Jalankan Rector untuk deprecation (implicit nullable, (integer)), lalu scan ulang: versi baru ditambahkan dan laporan menunjukkan apa yang teratasi.",
+    "Untuk nilai dari database, baca log error dari aplikasi yang berjalan di PHP 8.5.12 (audit.php --logs): logs-app menunjukkan fatal error dan argumen NULL yang hanya terlihat di log.",
     "Jalankan test suite di PHP 8.5.12 dengan error_reporting(E_ALL) sebelum production dipindah."
   ],
   "notes": [

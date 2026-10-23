@@ -42,7 +42,7 @@
           "kind": "php.net",
           "title": "PHP 8.0 migration: backward incompatible changes",
           "url": "https://www.php.net/manual/en/migration80.incompatible.php",
-          "quote": "Support for deprecated curly braces for offset access has been removed. The (real) and (unset) casts have been removed. The ability to specify an autoloader using an __autoload() function has been removed."
+          "quote": "Support for deprecated curly braces for offset access has been removed."
         }
       ]
     },

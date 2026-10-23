@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Rebuild examples/sample-report.html (English) and examples/sample-report.id.html (Indonesian) from the bundled
-# fixtures and the analyst notes in examples/source/. Run it with the target PHP (8.5.12) as `php`, after
+# fixtures (legacy-app, composer-app, null-args, logs-app) and the analyst notes in examples/source/. Run it with the target PHP (8.5.12) as `php`, after
 # scripts/setup.sh. Needs network for Packagist metadata (public package names only).
 set -euo pipefail
 
@@ -26,6 +26,13 @@ cp "$SRC/legacy-app-2.en.json" "$STORE/legacy-app/scans/$(latest legacy-app)/not
 # composer-app: runtime proof (installs nothing: the fixture has no dependencies)
 php "$DIR/scripts/audit.php" "$DIR/fixtures/composer-app" --out="$STORE" --name=composer-app --target=$TARGET --load-classes
 cp "$SRC/composer-app.en.json" "$STORE/composer-app/scans/$(latest composer-app)/notes.json"
+
+# null-args: null passed to built-ins, each finding with its detail (no notes: the automatic view)
+php "$DIR/scripts/audit.php" "$DIR/fixtures/null-args" --out="$STORE" --name=null-args --target=$TARGET
+
+# logs-app: runtime logs (CodeIgniter and Laravel logs in the repo, a PHP error_log given with --logs)
+php "$DIR/scripts/audit.php" "$DIR/fixtures/logs-app" --out="$STORE" --name=logs-app --target=$TARGET --logs="$DIR/fixtures/logs-external/php_errors.log"
+cp "$SRC/logs-app.en.json" "$STORE/logs-app/scans/$(latest logs-app)/notes.json"
 cp "$SRC/overview.en.json" "$STORE/overview.json"
 
 php "$DIR/scripts/validate_notes.php" --store="$STORE"
@@ -37,6 +44,7 @@ for n in 1 2; do
   cp "$SRC/legacy-app-$n.id.json" "$TMP/store-id/legacy-app/scans/$(ls "$TMP/store-id/legacy-app/scans" | sed -n "${n}p")/notes.json"
 done
 cp "$SRC/composer-app.id.json" "$TMP/store-id/composer-app/scans/$(ls "$TMP/store-id/composer-app/scans" | tail -1)/notes.json"
+cp "$SRC/logs-app.id.json" "$TMP/store-id/logs-app/scans/$(ls "$TMP/store-id/logs-app/scans" | tail -1)/notes.json"
 cp "$SRC/overview.id.json" "$TMP/store-id/overview.json"
 php "$DIR/scripts/validate_notes.php" --store="$TMP/store-id"
 php "$DIR/scripts/render.php" --store="$TMP/store-id" --out="$DIR/examples/sample-report.id.html" --lang=id --offline --title="Contoh: Audit Upgrade PHP"
