@@ -716,11 +716,27 @@ final class Scanner
             }
             $why = $this->nullableExpr($args[$pos][0], $args[$pos][1], $i);
             if ($why !== null) {
-                $func = str_starts_with($name, 'new:') ? 'new ' . substr($name, 4) : $name;
+                $func = self::displayName($name);
                 $this->add($this->special['null_to_internal'], $this->sig[$i][2], ['conf' => $why['conf'], 'detail' => ['func' => $func, 'param' => $pos + 1] + $why]);
                 return;
             }
         }
+    }
+
+    /** "new:datetime" / "datetime::createfromformat" / "json_decode" as PHP spells them, for the report. */
+    private static function displayName(string $name): string
+    {
+        try {
+            if (str_starts_with($name, 'new:')) {
+                return 'new ' . (new ReflectionClass(substr($name, 4)))->getName();
+            }
+            if (str_contains($name, '::')) {
+                [$c, $m] = explode('::', $name, 2);
+                return (new ReflectionClass($c))->getName() . '::' . (new ReflectionMethod($c, $m))->getName();
+            }
+        } catch (ReflectionException) {
+        }
+        return str_starts_with($name, 'new:') ? 'new ' . substr($name, 4) : $name;
     }
 
     /** Internal functions => 0-based positions of scalar parameters that reject null (null_params.php + this PHP). */

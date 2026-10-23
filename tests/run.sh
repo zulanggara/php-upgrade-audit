@@ -258,6 +258,14 @@ $ok = $s["version"] === "2.1.0" && ($lv["error"] ?? 0) === (int) $m[1] && ($lv["
 if (!$ok) { fwrite(STDERR, json_encode($lv) . " vs " . ($m[0] ?? "?") . "\n"); exit(1); }' "$TMP/out.sarif" "$TMP/sarif.err" || fail "SARIF does not match the findings"
 code=0; php "$DIR/scripts/audit.php" "$DIR/fixtures/legacy-app" --out="$TMP/st-sarif" --sarif="$DIR/fixtures/legacy-app/x.sarif" --offline > /dev/null 2>&1 || code=$?
 [ $code = 1 ] && [ ! -e "$DIR/fixtures/legacy-app/x.sarif" ] || fail "--sarif inside the audited repo was not refused"
+php "$DIR/scripts/audit.php" "$DIR/fixtures/null-args" --out="$TMP/st-null" --name=null-args --offline --skip=libs,phpcompat,rector --sarif="$TMP/null.sarif" > /dev/null 2>&1 \
+  || fail "audit --sarif on fixtures/null-args failed"
+php -r '$r = json_decode(file_get_contents($argv[1]), true)["runs"][0]["results"];
+$want = ["Argument 1 of json_decode() can be null: \$this->input->post(\x27payload\x27) (CodeIgniter input).", "Argument 1 of strtoupper() can be null via \$role (line 9):", "Argument 1 of json_decode() is a literal null."];
+$texts = array_column(array_column(array_filter($r, fn ($x) => $x["ruleId"] === "P81-NULL-TO-INTERNAL"), "message"), "text");
+foreach ($want as $w) { if (!array_filter($texts, fn ($t) => str_starts_with($t, $w))) { fwrite(STDERR, "missing: $w\n"); exit(1); } }
+$conf = array_column(array_column(array_filter($r, fn ($x) => $x["ruleId"] === "P81-NULL-TO-INTERNAL"), "properties"), "confidence");
+exit(count($texts) === 14 && in_array("tinggi", $conf, true) && in_array("rendah", $conf, true) ? 0 : 1);' "$TMP/null.sarif" || fail "SARIF does not carry the null-argument detail and confidence"
 echo "sarif: ok"
 
 # Render in both languages, offline, without local paths
@@ -280,6 +288,13 @@ if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
     for lang in en id; do
       node "$DIR/tests/page_check.js" "$TMP/report-$lang.html" --expect-link=https://wiki.php.net/rfc/bcrypt_cost_2023 || fail "a report page failed to render ($lang)"
     done
+    # The detail of each null-argument finding and its own confidence are shown, in both languages
+    php "$DIR/scripts/render.php" --store="$TMP/st-null" --out="$TMP/null-en.html" --lang=en --offline 2> /dev/null
+    php "$DIR/scripts/render.php" --store="$TMP/st-null" --out="$TMP/null-id.html" --lang=id --offline 2> /dev/null
+    node "$DIR/tests/page_check.js" "$TMP/null-en.html" "--expect-text=argument 1 of json_decode() can be null: \$this->input->post('payload') (CodeIgniter input)" \
+      "--expect-text=argument 1 of strtoupper() can be null via \$role (line 9)" "--expect-text=Confidence: low" > /dev/null || fail "null-argument detail not shown (en)"
+    node "$DIR/tests/page_check.js" "$TMP/null-id.html" "--expect-text=argumen 1 json_decode() bisa null: \$this->input->post('payload') (CodeIgniter input)" \
+      "--expect-text=lewat \$role (baris 9)" "--expect-text=Keyakinan: rendah" > /dev/null || fail "null-argument detail not shown (id)"
   else
     echo "pages: skipped (could not install jsdom; run 'npm install' in tests/)"
   fi

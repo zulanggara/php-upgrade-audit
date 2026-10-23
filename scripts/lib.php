@@ -329,3 +329,21 @@ function printJson(array $data): void
     $data = redact_data($data);
     echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), "\n";
 }
+
+/**
+ * One sentence for the "detail" of a finding (P81-NULL-TO-INTERNAL): which argument can be null and where the
+ * value comes from. The report template has the same wording in English and Indonesian.
+ */
+function finding_detail_text(array $d): string
+{
+    $call = str_starts_with((string) ($d['func'] ?? ''), 'new ') ? $d['func'] . '()' : ($d['func'] ?? '?') . '()';
+    $arg = "Argument {$d['param']} of $call";
+    $from = ($d['source'] ?? '') . (isset($d['label']) ? " ({$d['label']})" : '');
+    return match ($d['kind'] ?? '') {
+        'null' => "$arg is a literal null.",
+        'coalesce-null' => "$arg can be null: {$d['source']} falls back to null.",
+        'superglobal' => "$arg can be null: {$d['source']} is read without isset().",
+        'variable' => "$arg can be null via {$d['via']} (line {$d['via_line']}): $from.",
+        default => "$arg can be null: $from.",
+    };
+}

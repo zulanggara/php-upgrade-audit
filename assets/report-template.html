@@ -235,6 +235,13 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       extTitle: (n) => `PHP extensions required by packages (${n})`, ext: 'Extension', requiredBy: 'Required by', inTarget: 'Status on target PHP', removedSince: (v) => `removed from core since ${v}`, available: 'available',
       findings: 'Code findings', findingsLead: 'Click a row to see the locations. <b>Rector</b>: <i>yes</i> means Rector can fix it automatically in this repo; <i>available</i> means a Rector rule exists.',
       showGuarded: (t) => `show code that does not run on ${t}`, search: 'Search file or issue', noFindings: 'No findings for this filter.',
+      confName: { tinggi: 'high', sedang: 'medium', rendah: 'low' },
+      nullDetail: (d) => {
+        const call = `${d.func}()`, arg = `argument ${d.param} of ${call}`, from = `${d.source}${d.label ? ` (${d.label})` : ''}`;
+        return ({ null: `${arg} is a literal null`, 'coalesce-null': `${arg} can be null: ${d.source} falls back to null`,
+          superglobal: `${arg} can be null: ${d.source} is read without isset()`,
+          variable: `${arg} can be null via ${d.via} (line ${d.via_line}): ${from}` })[d.kind] || `${arg} can be null: ${from}`;
+      },
       level: 'Level', since: 'Since', issue: 'Issue and fix', count: 'Count', confidence: 'Confidence', files: 'file(s)', guardedBy: 'Guarded by', showMore: (n) => `Show ${n} more`, yes: 'yes', avail: 'available',
       guard: { mati: 'not run on the target version', jalan: 'runs on the target version', '?': 'condition could not be evaluated' },
       rtSum: (p, l, u, f, x, d) => `Runtime proof on PHP ${p} (class loading): ${l} of ${u} loaded, ${f} failed, ${x} unresolved, ${d} deprecation(s)`,
@@ -283,6 +290,13 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
       extTitle: (n) => `Ekstensi PHP yang dibutuhkan package (${n})`, ext: 'Ekstensi', requiredBy: 'Dibutuhkan oleh', inTarget: 'Status di PHP target', removedSince: (v) => `dihapus dari core sejak ${v}`, available: 'tersedia',
       findings: 'Temuan kode', findingsLead: 'Klik baris untuk melihat lokasinya. Kolom <b>Rector</b>: <i>ya</i> berarti Rector bisa memperbaiki otomatis di repo ini; <i>tersedia</i> berarti aturan Rector-nya ada.',
       showGuarded: (t) => `tampilkan kode yang tidak dijalankan di ${t}`, search: 'Cari file atau masalah', noFindings: 'Tidak ada temuan untuk filter ini.',
+      confName: { tinggi: 'tinggi', sedang: 'sedang', rendah: 'rendah' },
+      nullDetail: (d) => {
+        const call = `${d.func}()`, arg = `argumen ${d.param} ${call}`, from = `${d.source}${d.label ? ` (${d.label})` : ''}`;
+        return ({ null: `${arg} berisi null langsung`, 'coalesce-null': `${arg} bisa null: ${d.source} jatuh ke null`,
+          superglobal: `${arg} bisa null: ${d.source} dibaca tanpa isset()`,
+          variable: `${arg} bisa null lewat ${d.via} (baris ${d.via_line}): ${from}` })[d.kind] || `${arg} bisa null: ${from}`;
+      },
       level: 'Tingkat', since: 'Sejak', issue: 'Masalah dan perbaikan', count: 'Jumlah', confidence: 'Keyakinan', files: 'file', guardedBy: 'Dijaga', showMore: (n) => `Tampilkan ${n} lagi`, yes: 'ya', avail: 'tersedia',
       guard: { mati: 'tidak dijalankan di versi target', jalan: 'dijalankan di versi target', '?': 'kondisi tidak bisa dievaluasi' },
       rtSum: (p, l, u, f, x, d) => `Bukti runtime di PHP ${p} (memuat class): ${l} dari ${u} termuat, ${f} gagal, ${x} belum terselesaikan, ${d} deprecation`,
@@ -738,6 +752,13 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
     const state = { sev: new Set(SEV_ORDER), guarded: false, q: '' };
     const open = new Set();
     const limits = {};
+    // Rules whose findings carry their own confidence show how many of each, highest first.
+    const confCell = (m, hits) => {
+      const per = {};
+      for (const h of hits) if (h.conf) per[h.conf] = (per[h.conf] || 0) + 1;
+      const order = ['tinggi', 'sedang', 'rendah'].filter((c) => per[c]);
+      return order.length ? order.map((c) => `${esc(T.confName[c] || c)} ${per[c]}`).join('<br>') : esc(T.confName[m.conf] || m.conf || '');
+    };
     function render() {
       const groups = {};
       const q = state.q.toLowerCase();
@@ -745,7 +766,7 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
         const meta = rules[f.rule] || { sev: 'info', title: f.rule };
         if (!state.sev.has(meta.sev)) continue;
         if (f.guarded && !state.guarded) continue;
-        if (q && !(f.file.toLowerCase().includes(q) || (meta.title || '').toLowerCase().includes(q) || f.rule.toLowerCase().includes(q) || (f.code || '').toLowerCase().includes(q))) continue;
+        if (q && !(f.file.toLowerCase().includes(q) || (meta.title || '').toLowerCase().includes(q) || f.rule.toLowerCase().includes(q) || (f.code || '').toLowerCase().includes(q) || (f.detail ? JSON.stringify(f.detail).toLowerCase().includes(q) : false))) continue;
         (groups[f.rule] = groups[f.rule] || []).push(f);
       }
       const ids = Object.keys(groups).sort((x, y) => SEV_ORDER.indexOf(rules[x].sev) - SEV_ORDER.indexOf(rules[y].sev) || groups[y].length - groups[x].length);
@@ -758,12 +779,12 @@ footer { color: var(--muted); font-size: 13px; margin-top: 40px; padding-top: 16
           const expanded = open.has(id);
           const limit = limits[id] || 200;
           const detail = !expanded ? '' : `<tr class="detail"><td colspan="6"><ul class="hits">` + hits.slice(0, limit).map((h) =>
-            `<li><span class="loc">${esc(h.file)}:${h.line}</span>${h.guard ? `<span class="guard">${esc(T.guardedBy)} <code>${esc(h.guard)}</code>: ${esc(T.guard[h.guard_state] || '')}</span>` : ''}<code>${esc(h.code)}</code></li>`).join('') +
+            `<li><span class="loc">${esc(h.file)}:${h.line}${h.conf ? ` · ${esc(T.confidence)}: ${esc(T.confName[h.conf] || h.conf)}` : ''}</span>${h.detail ? `<span class="guard">${esc(T.nullDetail(h.detail))}</span>` : ''}${h.guard ? `<span class="guard">${esc(T.guardedBy)} <code>${esc(h.guard)}</code>: ${esc(T.guard[h.guard_state] || '')}</span>` : ''}<code>${esc(h.code)}</code></li>`).join('') +
             (hits.length > limit ? `<li><button type="button" class="more" data-more="${esc(id)}">${esc(T.showMore(hits.length - limit))}</button></li>` : '') + `</ul></td></tr>`;
           return `<tr class="rule-row" data-rule="${esc(id)}" tabindex="0" aria-expanded="${expanded}"><td><span class="caret">▸</span> ${pill(m.sev)}</td>
             <td class="mono">${esc(m.ver)}</td>
             <td><div>${esc(m.title)}</div><div class="sub">${esc(m.fix)} ${safeUrl(m.ref) ? `<a href="${esc(m.ref)}" target="_blank" rel="noopener noreferrer">php.net</a>` : ''}${(m.evidence || []).filter((x) => safeUrl(x.url)).map((x) => ` · <a href="${esc(x.url)}" title="${esc(x.quote ? `${x.title}: "${x.quote}"` : (x.title || ''))}" target="_blank" rel="noopener noreferrer">${esc((T.evKind || {})[x.kind] || x.title || x.kind)}</a>`).join('')} · <span class="mono">${esc(id)}</span></div></td>
-            <td class="num">${hits.length}<div class="sub">${files} ${esc(T.files)}</div></td><td>${esc(m.conf)}</td><td>${esc(auto)}</td></tr>${detail}`;
+            <td class="num">${hits.length}<div class="sub">${files} ${esc(T.files)}</div></td><td>${confCell(m, hits)}</td><td>${esc(auto)}</td></tr>${detail}`;
         }).join('') + '</tbody>';
     }
     table.addEventListener('click', (ev) => {

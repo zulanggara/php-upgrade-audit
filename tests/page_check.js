@@ -1,12 +1,16 @@
 // Opens every page of a rendered report in jsdom and fails on a script error, an empty page, or a link whose
 // scheme is not http(s) (notes are written from audited code: a javascript: link must never be rendered).
-// Usage: node page_check.js <report.html> [--expect-link=<url>]...   (each url must be linked on some page)
+// Every rule row is expanded too, so the per-finding lines (locations, detail, confidence) are rendered.
+// Usage: node page_check.js <report.html> [--expect-link=<url>]... [--expect-text=<text>]...
+//        (each url must be linked, and each text must appear, on some page)
 const { JSDOM, VirtualConsole } = require('jsdom');
 const fs = require('fs');
 
 const file = process.argv.slice(2).find((a) => !a.startsWith('--'));
 const expected = process.argv.slice(2).filter((a) => a.startsWith('--expect-link=')).map((a) => a.slice(14));
+const expectedText = process.argv.slice(2).filter((a) => a.startsWith('--expect-text=')).map((a) => a.slice(14));
 const seen = new Set();
+const seenText = [];
 if (!file) { console.error('Usage: node page_check.js <report.html>'); process.exit(2); }
 const html = '<!doctype html><html><head></head><body>' + fs.readFileSync(file, 'utf8') + '</body></html>';
 
@@ -34,6 +38,13 @@ for (const h of [...new Set(hashes)]) {
   const { dom, errors } = load(h);
   const pages = dom.window.document.querySelector('#pages');
   const text = pages ? pages.textContent.length : 0;
+  for (let n = 0; n < 300; n++) {
+    const row = dom.window.document.querySelector('tr.rule-row[aria-expanded="false"]');
+    if (!row) break;
+    row.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    if (row.isConnected && row.getAttribute('aria-expanded') === 'false') break;
+  }
+  if (pages) seenText.push(pages.textContent);
   if (errors.length || !pages || pages.children.length === 0 || text < 200) {
     failed++;
     console.error(`FAIL #${h}: ${errors[0] || 'page is empty (' + text + ' chars)'}`);
@@ -49,6 +60,9 @@ for (const h of [...new Set(hashes)]) {
 }
 for (const u of expected) {
   if (!seen.has(u)) { failed++; console.error(`FAIL: expected link not found: ${u}`); }
+}
+for (const t of expectedText) {
+  if (!seenText.some((x) => x.includes(t))) { failed++; console.error(`FAIL: expected text not found: ${t}`); }
 }
 const total = new Set(hashes).size;
 console.log(failed ? `pages: ${failed} of ${total} failed` : `pages: ok (${total} pages opened)`);

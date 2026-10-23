@@ -78,8 +78,8 @@ function toSarif(array $report, ?string $repo): array
             'properties' => ['tags' => array_values(array_filter(['php-upgrade', $sev, ...$extra]))],
         ], fn ($v) => $v !== null);
     };
-    $result = function (string $id, string $sev, string $message, string $file, int $line) use (&$results, $level): void {
-        $results[] = [
+    $result = function (string $id, string $sev, string $message, string $file, int $line, array $props = []) use (&$results, $level): void {
+        $results[] = array_filter([
             'ruleId' => $id,
             'level' => $level[$sev] ?? 'note',
             'message' => ['text' => $message],
@@ -87,7 +87,8 @@ function toSarif(array $report, ?string $repo): array
                 'artifactLocation' => ['uri' => ltrim(str_replace('\\', '/', $file), '/'), 'uriBaseId' => '%SRCROOT%'],
                 'region' => ['startLine' => max(1, $line)],
             ]]],
-        ];
+            'properties' => $props ?: null,
+        ], fn ($v) => $v !== null);
     };
 
     $meta = $report['scan']['rules'] ?? [];
@@ -99,7 +100,9 @@ function toSarif(array $report, ?string $repo): array
         $sev = $m['sev'] ?? 'info';
         [$title, $fix] = $en[$f['rule']] ?? [$m['title'] ?? $f['rule'], $m['fix'] ?? ''];
         $rule($f['rule'], $sev, $title, $fix, $m['ref'] ?? null, ['PHP ' . ($m['ver'] ?? '?')]);
-        $result($f['rule'], $sev, rtrim($title, '.') . ". $fix (target PHP $target)" . (($f['guard_state'] ?? '') === '?' ? ' The code is guarded by a check that needs a look by hand.' : ''), $f['file'], (int) $f['line']);
+        $detail = isset($f['detail']) && is_array($f['detail']) ? finding_detail_text($f['detail']) . ' ' : '';
+        $result($f['rule'], $sev, $detail . rtrim($title, '.') . ". $fix (target PHP $target)" . (($f['guard_state'] ?? '') === '?' ? ' The code is guarded by a check that needs a look by hand.' : ''), $f['file'], (int) $f['line'],
+            array_filter(['confidence' => $f['conf'] ?? $m['conf'] ?? null]));
     }
     foreach ($report['lint']['errors'] ?? [] as $e) {
         $rule('LINT-ERROR', 'wajib', 'php -l error on the target PHP', 'The file does not compile on the PHP that ran php -l.', null);
