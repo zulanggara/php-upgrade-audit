@@ -1,8 +1,8 @@
 <?php
 /**
  * Check Composer libraries against the target PHP version. Read-only: only reads the repo's composer.json/lock.
- * Metadata comes from repo.packagist.org, and only for packages that actually come from Packagist
- * (private packages are never sent anywhere).
+ * Metadata and known security advisories come from packagist.org, and only for packages that actually come
+ * from Packagist (private packages are never sent anywhere).
  *
  * Usage: php check_libs.php <repo> [--target=8.5.12] [--cache=<dir>] [--offline] > libs.json
  */
@@ -18,10 +18,12 @@ Usage: php scripts/check_libs.php <repo> [--target=8.5.12] [--cache=<dir>] [--of
   For every locked package: its "php" constraint vs the target, release date, abandoned flag, and (from
   repo.packagist.org, public packages only) the latest version in the same major and the latest version that
   supports the target. Extensions required by packages that were removed from PHP are listed too.
+  Known security advisories (CVE/GHSA, from the Packagist security advisories API, the data "composer audit"
+  uses) that affect the installed version are listed per package, with the lowest version that fixes them.
   Without composer.lock the composer.json constraints are checked. Without composer.json the result is empty.
 
   --target   PHP version you move to (default: latest covered).
-  --cache    Folder for Packagist metadata (cached for 24 h).
+  --cache    Folder for Packagist metadata (cached for 24 h) and advisories (cached for 6 h).
   --offline  No network request; only the lock file is used.
 HELP);
 
@@ -54,7 +56,8 @@ foreach (array_slice($argv, 2) as $arg) {
     }
 }
 $targetMinor = targetMinor($target);
-$out = ['tool' => 'check_libs', 'target' => $target, 'composer' => false, 'root' => null, 'packages' => [], 'extensions' => [], 'errors' => []];
+$out = ['tool' => 'check_libs', 'target' => $target, 'composer' => false, 'root' => null, 'packages' => [], 'extensions' => [], 'errors' => [],
+    'advisories' => ['checked' => false, 'source' => 'https://packagist.org/apidoc#list-security-advisories', 'count' => 0]];
 
 $jsonPath = "$repo/composer.json";
 $lockPath = "$repo/composer.lock";
@@ -68,6 +71,7 @@ if (!is_file($jsonPath)) {
         }
     }
     $out['extensions'] = extensionRows($exts, $target);
+    attachAdvisories($out, $target, $offline, $cacheDir);
     printJson($out);
     exit(0);
 }
@@ -128,8 +132,124 @@ foreach ($bundled as $b) {
     }
 }
 $out['extensions'] = extensionRows($exts, $target);
+attachAdvisories($out, $target, $offline, $cacheDir);
 
 printJson($out);
+
+/**
+ * Security advisories that affect the installed version of each public package, and the lowest stable version
+ * at or above it that none of the package's advisories affects and that supports the target ("fixed_in").
+ */
+function attachAdvisories(array &$out, string $target, bool $offline, string $cacheDir): void
+{
+    $names = [];
+    foreach ($out['packages'] as $p) {
+        if (($p['source'] ?? '') === 'packagist' && ($p['version'] ?? null) !== null) {
+            $names[$p['name']] = true;
+        }
+    }
+    if ($offline || $names === []) {
+        return;
+    }
+    [$all, $ok] = packagistAdvisories(array_keys($names), $cacheDir, $out['errors']);
+    $out['advisories']['checked'] = $ok;
+    $parser = new VersionParser();
+    foreach ($out['packages'] as &$p) {
+        $list = $all[$p['name']] ?? [];
+        if ($list === [] || ($p['version'] ?? null) === null) {
+            continue;
+        }
+        $version = ltrim((string) $p['version'], 'vV');
+        $hits = array_values(array_filter($list, fn ($a) => safeSatisfies($version, (string) ($a['affectedVersions'] ?? '')) === true));
+        if ($hits === []) {
+            continue;
+        }
+        $p['advisories'] = [];
+        foreach ($hits as $a) {
+            $ghsa = null;
+            foreach (array_merge([['remoteId' => $a['remoteId'] ?? '']], $a['sources'] ?? []) as $src) {
+                if (preg_match('/^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$/', (string) ($src['remoteId'] ?? ''))) {
+                    $ghsa = $src['remoteId'];
+                    break;
+                }
+            }
+            $cve = preg_match('/^CVE-\d{4}-\d+$/', (string) ($a['cve'] ?? '')) ? $a['cve'] : null;
+            $key = $cve ?? $ghsa ?? ($a['advisoryId'] ?? '');
+            if (isset($p['advisories'][$key])) {
+                continue; // the same CVE from two sources
+            }
+            $link = preg_match('#^https://[^\s]+$#', (string) ($a['link'] ?? '')) ? $a['link'] : null;
+            $p['advisories'][$key] = [
+                'id' => $ghsa ?? $cve ?? ($a['advisoryId'] ?? null),
+                'cve' => $cve,
+                'title' => (string) ($a['title'] ?? ''),
+                'severity' => $a['severity'] ?? null,
+                'affected' => (string) ($a['affectedVersions'] ?? ''),
+                'reported' => isset($a['reportedAt']) ? substr((string) $a['reportedAt'], 0, 10) : null,
+                'url' => $link ?? ($ghsa !== null ? "https://github.com/advisories/$ghsa" : null),
+                'cve_url' => $cve === null ? null : "https://www.cve.org/CVERecord?id=$cve",
+            ];
+        }
+        $p['advisories'] = array_values($p['advisories']);
+        $hits = $p['advisories'];
+        $out['advisories']['count'] += count($hits);
+        $meta = packagistVersions($p['name'], $cacheDir, $out['errors']);
+        if ($meta === null) {
+            continue;
+        }
+        try {
+            $current = $parser->normalize($version);
+        } catch (Throwable) {
+            continue;
+        }
+        $candidates = array_filter($meta['versions'], fn ($v) => isStable($v['version']) && version_compare($v['version_normalized'], $current, '>=')
+            && phpOk($v, $target) && !array_filter($list, fn ($a) => safeSatisfies(ltrim($v['version'], 'vV'), (string) ($a['affectedVersions'] ?? '')) === true));
+        usort($candidates, fn ($a, $b) => version_compare($a['version_normalized'], $b['version_normalized']));
+        $fix = $candidates[0] ?? null;
+        $p['fixed_in'] = $fix === null ? null : ['version' => $fix['version'], 'php' => $fix['require']['php'] ?? null, 'released' => isset($fix['time']) ? substr($fix['time'], 0, 10) : null];
+    }
+    unset($p);
+}
+
+/**
+ * Advisories per package from the Packagist security advisories API (GitHub Advisory Database and
+ * FriendsOfPHP). Returns [name => list, all answered?]. Each package's answer is cached for 6 hours.
+ */
+function packagistAdvisories(array $names, string $cacheDir, array &$errors): array
+{
+    @mkdir($cacheDir, 0700, true);
+    $result = [];
+    $todo = [];
+    foreach ($names as $name) {
+        if (!preg_match('#^[a-z0-9_.-]+/[a-z0-9_.-]+$#', $name)) {
+            continue;
+        }
+        $cache = "$cacheDir/advisories~" . str_replace('/', '~', $name) . '.json';
+        $cached = is_file($cache) && filemtime($cache) > time() - 6 * 3600 ? json_decode((string) file_get_contents($cache), true) : null;
+        if (is_array($cached)) {
+            $result[$name] = $cached;
+        } else {
+            $todo[] = $name;
+        }
+    }
+    $ok = true;
+    foreach (array_chunk($todo, 40) as $chunk) {
+        $query = implode('&', array_map(fn ($n) => 'packages[]=' . rawurlencode($n), $chunk));
+        $ctx = stream_context_create(['http' => ['timeout' => 20, 'user_agent' => 'php-upgrade-audit (+local audit skill)']]);
+        $data = json_decode((string) @file_get_contents("https://packagist.org/api/security-advisories/?$query", false, $ctx), true);
+        if (!is_array($data) || !is_array($data['advisories'] ?? null)) {
+            $errors[] = 'Packagist: gagal ambil security advisories (' . count($chunk) . ' package)';
+            $ok = false;
+            continue;
+        }
+        foreach ($chunk as $name) {
+            $list = array_values((array) ($data['advisories'][$name] ?? []));
+            $result[$name] = $list;
+            file_put_contents("$cacheDir/advisories~" . str_replace('/', '~', $name) . '.json', json_encode($list, JSON_UNESCAPED_SLASHES));
+        }
+    }
+    return [$result, $ok];
+}
 
 function extensionRows(array $exts, string $target): array
 {

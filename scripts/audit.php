@@ -180,7 +180,7 @@ history_add($entity, $name, 'repo', $id, ['generated_at' => $report['generated_a
 
 $counts = countByLevel($report);
 fwrite(STDERR, "[$name] done: scan $id" . ($previous ? " (previous: {$previous['id']}" . ($carried ? ', notes carried over for review' : '') . ')' : ' (first scan)') . "\n");
-fwrite(STDERR, sprintf("[%s] findings: wajib %d, deprecated %d, perilaku %d (lint errors and unsupported libraries count as wajib)\n", $name, $counts['wajib'], $counts['deprecated'], $counts['perilaku']));
+fwrite(STDERR, sprintf("[%s] findings: wajib %d, deprecated %d, perilaku %d (lint errors, unsupported libraries and security advisories count as wajib)\n", $name, $counts['wajib'], $counts['deprecated'], $counts['perilaku']));
 echo "$dir/report.json\n";
 
 if ($failOn !== null) {
@@ -213,6 +213,9 @@ function countByLevel(array $report): array
         if (in_array($p['status'] ?? '', ['tidak-didukung', 'perlu-upgrade'], true)) {
             $counts['wajib']++;
         }
+    }
+    foreach ($report['libs']['packages'] ?? [] as $p) {
+        $counts['wajib'] += count($p['advisories'] ?? []); // a known vulnerability in the installed version
     }
     foreach ($report['libs']['extensions'] ?? [] as $e) {
         if (!empty($e['removed_in'])) {

@@ -154,6 +154,37 @@ JSON
   if ($s !== $want) { fwrite(STDERR, json_encode($s) . "\n"); exit(1); }' "$TMP/libs.json" || fail "library statuses are wrong"
   echo "library status: ok"
 
+  # Security advisories (Packagist API, seeded in the cache): only the ones that affect the installed version,
+  # the lowest fixed version that supports the target, links to GHSA and CVE; none with --offline
+  mkdir -p "$TMP/adv" "$TMP/adv-cache"
+  echo '{"require":{"php":"^8.1"}}' > "$TMP/adv/composer.json"
+  echo '{"packages":[{"name":"acme/vuln","version":"v1.0.0","require":{"php":"^8.1"},"time":"2026-01-01T00:00:00+00:00","notification-url":"https://packagist.org/downloads/"}],"packages-dev":[]}' > "$TMP/adv/composer.lock"
+  cat > "$TMP/adv-cache/advisories~acme~vuln.json" <<'JSON'
+[{"advisoryId":"PKSA-aaaa-bbbb-cccc","remoteId":"GHSA-2x45-7fc3-mxwq","title":"Weak keys accepted","link":"https://github.com/advisories/GHSA-2x45-7fc3-mxwq","cve":"CVE-2025-45769","affectedVersions":"<1.2.0","severity":"high","reportedAt":"2025-07-31 21:31:53","sources":[]},
+ {"advisoryId":"PKSA-dddd-eeee-ffff","remoteId":"acme/vuln/CVE-2025-45769.yaml","title":"Weak keys accepted","link":"","cve":"CVE-2025-45769","affectedVersions":"<1.2.0","severity":"high","sources":[{"name":"GitHub","remoteId":"GHSA-2x45-7fc3-mxwq"}]},
+ {"advisoryId":"PKSA-gggg-hhhh-iiii","remoteId":"GHSA-8xf4-w7qw-pjjw","title":"Old bug","link":"javascript:alert(1)","cve":"CVE-2021-46743","affectedVersions":"<0.5.0","severity":"critical","sources":[]}]
+JSON
+  cat > "$TMP/adv-cache/acme~vuln.json" <<'JSON'
+{"packages":{"acme/vuln":[
+ {"version":"v1.3.0","version_normalized":"1.3.0.0","require":{"php":"^9.0"},"time":"2026-09-01T00:00:00+00:00"},
+ {"version":"v1.2.0","version_normalized":"1.2.0.0","require":{"php":"^8.1"},"time":"2026-06-01T00:00:00+00:00"},
+ {"version":"v1.1.0","version_normalized":"1.1.0.0","require":{"php":"^8.1"},"time":"2026-03-01T00:00:00+00:00"},
+ {"version":"v1.0.0","version_normalized":"1.0.0.0","require":{"php":"^8.1"},"time":"2026-01-01T00:00:00+00:00"}]}}
+JSON
+  php "$DIR/scripts/check_libs.php" "$TMP/adv" --target=8.5.12 --cache="$TMP/adv-cache" > "$TMP/adv.json"
+  php -r '
+  $d = json_decode(file_get_contents($argv[1]), true); $p = $d["packages"][0];
+  $a = $p["advisories"] ?? [];
+  $ok = $d["advisories"]["checked"] === true && $d["advisories"]["count"] === 1 && count($a) === 1
+     && $a[0]["id"] === "GHSA-2x45-7fc3-mxwq" && $a[0]["cve"] === "CVE-2025-45769" && $a[0]["severity"] === "high"
+     && $a[0]["url"] === "https://github.com/advisories/GHSA-2x45-7fc3-mxwq" && $a[0]["cve_url"] === "https://www.cve.org/CVERecord?id=CVE-2025-45769"
+     && ($p["fixed_in"]["version"] ?? null) === "v1.2.0";
+  if (!$ok) { fwrite(STDERR, json_encode($d, JSON_PRETTY_PRINT)); exit(1); }' "$TMP/adv.json" || fail "security advisories are wrong"
+  php "$DIR/scripts/check_libs.php" "$TMP/adv" --target=8.5.12 --cache="$TMP/adv-cache" --offline > "$TMP/adv-off.json"
+  php -r '$d = json_decode(file_get_contents($argv[1]), true); exit($d["advisories"]["checked"] === false && !isset($d["packages"][0]["advisories"]) ? 0 : 1);' "$TMP/adv-off.json" \
+    || fail "--offline still reported advisories"
+  echo "security advisories: ok"
+
   # Upgrade notes with sources for known breaking changes (the fixture has php-jwt 5, guzzle 6, monolog 1)
   php "$DIR/scripts/check_libs.php" "$DIR/fixtures/legacy-app" --offline > "$TMP/notes-libs.json"
   php -r '
