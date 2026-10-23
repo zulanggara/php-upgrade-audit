@@ -198,17 +198,19 @@ JSON
     || fail "--offline still reported advisories"
   echo "security advisories: ok"
 
-  # Upgrade notes with sources for known breaking changes (the fixture has php-jwt 5, guzzle 6, monolog 1)
+  # Upgrade notes with sources for known breaking changes (the fixture has php-jwt 5, guzzle 6, monolog 1,
+  # Swift Mailer 5 and PHPUnit 7)
   php "$DIR/scripts/check_libs.php" "$DIR/fixtures/legacy-app" --offline > "$TMP/notes-libs.json"
   php -r '
   $n = [];
   foreach (json_decode(file_get_contents($argv[1]), true)["packages"] as $p) {
-      foreach ($p["upgrade_notes"] ?? [] as $u) { $n[$p["name"]][] = $u["to"]; foreach ($u["evidence"] as $e) { if (!str_starts_with($e["url"], "https://")) exit(2); } }
+      foreach ($p["upgrade_notes"] ?? [] as $u) { $n[$p["name"]][] = $u["to"] ?? "replace: " . $u["replaced_by"]; foreach ($u["evidence"] as $e) { if (!str_starts_with($e["url"], "https://")) exit(2); } }
   }
-  $want = ["guzzlehttp/guzzle" => ["7.0.0"], "monolog/monolog" => ["2.0.0", "3.0.0"], "firebase/php-jwt" => ["7.0.0"]];
+  $want = ["guzzlehttp/guzzle" => ["7.0.0"], "monolog/monolog" => ["2.0.0", "3.0.0"], "swiftmailer/swiftmailer" => ["replace: symfony/mailer"],
+      "firebase/php-jwt" => ["7.0.0"], "phpunit/phpunit" => ["10.0.0"]];
   if ($n !== $want) { fwrite(STDERR, json_encode($n) . "\n"); exit(1); }' "$TMP/notes-libs.json" || fail "library upgrade notes are wrong"
   grep -q '"packagist": "https://packagist.org/packages/firebase/php-jwt"' "$TMP/notes-libs.json" || fail "Packagist link missing"
-  php -r 'foreach (require $argv[1] as $n) { foreach (["package", "from", "to", "sev", "en", "id", "evidence"] as $k) { if (!isset($n[$k])) { fwrite(STDERR, "library_notes.php: $k missing\n"); exit(1); } } }' "$DIR/scripts/library_notes.php" || fail "library_notes.php entry incomplete"
+  php -r 'foreach (require $argv[1] as $n) { foreach (["package", "from", "sev", "en", "id", "evidence"] as $k) { if (!isset($n[$k]) || !(isset($n["to"]) || isset($n["replaced_by"]))) { fwrite(STDERR, "library_notes.php: $k missing\n"); exit(1); } } }' "$DIR/scripts/library_notes.php" || fail "library_notes.php entry incomplete"
   echo "library notes: ok"
 fi
 
