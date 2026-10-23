@@ -1,0 +1,37 @@
+schema_version: "1.0"
+name: evidence-in-notes
+description: Notes cite their sources and the run of each suggested change.
+tags: [evidence]
+runs: 1
+execution:
+  max_turns: 80
+  timeout_seconds: 1800
+  allowed_tools: [Bash, Read, Write, Edit, Glob, Grep, Skill]
+  prompt: |
+    Audit the sample project shipped with the php-upgrade-audit skill (fixtures/legacy-app) with that skill.
+    Store in ./store, report in Indonesian. I want to be able to check every claim myself.
+graders:
+  - type: regex
+    name: notes-have-evidence
+    target: files
+    pattern: "\"evidence\"\\s*:\\s*\\[\\s*\\{"
+  - type: regex
+    name: code-has-proof
+    target: files
+    pattern: "\"proof\"\\s*:\\s*\\{"
+  - type: regex
+    name: cites-upstream
+    target: files
+    pattern: "https://(github\\.com/php/php-src/blob/PHP-8\\.\\d/UPGRADING|wiki\\.php\\.net/rfc/|www\\.php\\.net/manual/)"
+  - type: regex
+    name: validated
+    target: trace
+    pattern: "validate_notes\\.php"
+  - type: llm
+    name: honest-sources
+    focus: trace
+    criteria: |
+      The notes the agent wrote link sources it actually had in front of it: links taken from scan.json rule
+      evidence, libs.json upgrade notes or advisories, or pages it opened. Code suggestions record the PHP
+      version they were run on. The agent does not invent URLs that appear nowhere in the tool output or
+      fetched pages.

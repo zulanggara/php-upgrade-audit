@@ -1,6 +1,6 @@
 ---
 name: php-upgrade-audit
-description: Read-only audit of how ready a PHP codebase (7.x or older 8.x; Laravel, Symfony, WordPress, CodeIgniter or plain PHP) is for a newer PHP 8 version, by default the latest covered (8.5.12) or any target such as 8.3.30. Finds removed, deprecated and behaviour-changing functions, syntax and helpers from PHP 7.1 to 8.5, proves it with php -l and by loading every class on the target PHP, checks Composer libraries (php constraint, abandoned packages, versions that support the target) and PHP extensions, compares framework versions, and produces a standardised HTML report with one page per repo and a full scan history. Never modifies the audited repo; secrets are redacted. Use when asked to check PHP 8.x compatibility, whether libraries support a PHP version, to audit before a PHP upgrade, or to assess a framework upgrade.
+description: Read-only audit of how ready a PHP codebase (7.x or older 8.x; Laravel, Symfony, WordPress, CodeIgniter or plain PHP) is for a newer PHP 8 version, by default the latest PHP release (8.5.x) or any target such as 8.3.30. Finds removed, deprecated and behaviour-changing functions, syntax and helpers from PHP 7.1 to 8.5, each linked to its php.net / php-src / RFC source, proves it with php -l and by loading every class on the target PHP (local binary or Docker), checks Composer libraries (php constraint, abandoned packages, known security advisories, versions that support the target) and PHP extensions, compares framework versions, and produces a standardised HTML report with one page per repo and a full scan history. Never modifies the audited repo; secrets are redacted. Use when asked to check PHP 8.x compatibility, whether libraries support a PHP version, to audit before a PHP upgrade, or to assess a framework upgrade.
 argument-hint: "<repo>... [--target=8.5.12] [--lang=en|id] [--store=<dir>] [--name=<label>]"
 ---
 
@@ -18,7 +18,10 @@ When invoked as a command, `$ARGUMENTS` holds what the user typed after it, for 
 
 - every argument that is not an option: a repo to audit (several are fine, each becomes a page);
 - `--target=<version>`: the PHP version to move to. Without it use the version the user names in their
-  message, otherwise the default (`latest`, the newest version the rules cover: 8.5.12);
+  message, otherwise leave it out: the default `latest` is the newest PHP release of the newest minor the rules
+  cover (asked from php.net; 8.5.12 offline). A bare minor (`8.3`) means its newest release. Never pick a
+  target yourself, and never lower it to the PHP that happens to be installed: that changes what is checked;
+  a missing target PHP is solved with `--php` (see below);
 - `--lang=en|id`: report language; without it, the language the user writes in;
 - `--store=<dir>`: the history store; default `~/php-audit-store` (keep it outside every repo; do not use a
   temporary folder, the history must survive the session);
@@ -28,14 +31,17 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
 
 ## Hard rules
 
-- Never write anything into the audited repo. Output, tool config and caches go to the store. `audit.php`
-  refuses an output folder inside the repo.
+- Never write anything into the audited repo, not even a test file to see whether it is writable. Output,
+  tool config and caches go to the store. `audit.php` refuses an output folder inside the repo. When the user
+  asks to fix the code as well, say the audit is read-only and point to the suggested code in the notes.
 - Never run `composer install/update` in the repo. `load_classes.php` installs in a scratch copy.
 - Rector only runs with `--dry-run` (enforced by `run_tools.php`).
 - Private packages (no Packagist `notification-url`) are never sent to Packagist. Use `--offline` to make no
   network request at all (`--load-classes` then skips the scratch install).
   `scripts/update.sh` contacts GitHub once a day to check for a new version of this kit (opt out with
-  `PHP_UPGRADE_AUDIT_NO_UPDATE=1`).
+  `PHP_UPGRADE_AUDIT_NO_UPDATE=1`); the default target asks php.net for the newest PHP release; the library
+  check asks packagist.org for security advisories of public packages; `--php=docker` pulls the official
+  `php` image.
 - Do not conclude from memory. Prove PHP behaviour by running a snippet on the target PHP, or cite php.net.
 - **Secrets never leave the machine in clear text.** Tool output and the rendered report are redacted
   automatically (`scripts/redact.php`). When you write notes or code samples yourself, mask secrets too
@@ -55,16 +61,19 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
 2. **Target PHP.** `php -l` and class loading prove behaviour on the PHP that runs them, so use the target:
    - `php -v` matches the target minor version: fine.
    - Otherwise look for the target binary (`php8.3`, `/opt/homebrew/opt/php@8.3/bin/php`, `/usr/bin/php8.3`)
-     and pass it as `--php=<binary>`. If there is none, tell the user, offer ways to get it (package manager,
-     Homebrew `php@8.3`, or Docker `php:8.3-cli`), and only continue without it if they agree: `audit.php`
-     then prints a warning, and the notes must say which PHP the runtime proof ran on.
+     and pass it as `--php=<binary>`.
+   - No binary but Docker is available: `--php=docker` runs php -l, the scanner and class loading in the
+     official `php:<target>-cli` image (no network, the repo read-only, removed afterwards).
+   - Neither: tell the user, offer ways to get it (package manager, Homebrew `php@8.3`, Docker), and only
+     continue without it if they agree: `audit.php` then prints a warning, and the notes must say which PHP
+     the runtime proof ran on.
 
 ## Workflow
 
 1. **Audit each repo** (a new version is added to the history store every time):
    ```bash
    php ${CLAUDE_SKILL_DIR}/scripts/audit.php <repo> --out=<STORE> --name=<label> --target=<version> --load-classes \
-       [--php=<target php>] [--exclude=tests,docs] [--skip=rector] [--memory=4G] [--offline]
+       [--php=<target php>|docker] [--exclude=tests,docs] [--skip=rector] [--memory=4G] [--offline] [--sarif=<file>]
    ```
    Result: `<STORE>/<name>/scans/<scan-id>/{profile,scan,lint,libs,runtime,phpcompat,rector,report}.json`. On a
    re-scan the previous notes are copied in with `carried_from` set. `php scripts/audit.php --help` lists
@@ -76,7 +85,8 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
 
 3. **Review.** Scanner output is input, not a conclusion:
    - Start with `wajib` (must fix) findings, `lint.json` errors and `runtime.json` `failed`, then libraries
-     `tidak-didukung` / `perlu-upgrade`, then `deprecated`, then `perilaku` (behaviour change).
+     `tidak-didukung` / `perlu-upgrade` and `advisories` (known vulnerabilities in the installed version, with
+     `fixed_in`), then `deprecated`, then `perilaku` (behaviour change).
    - Read the code around low/medium confidence findings before keeping them. Drop false positives.
    - Findings with `guard_state: mati` do not run on the target version. `jalan` means the guarded branch does
      run. `?` means the condition could not be evaluated: read it.
@@ -128,8 +138,9 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
      `changelog`, `release`, `upgrade`, `source`, `issue`, `cve`, `advisory`, `docs`, `run`) and a short exact
      `quote`. Only cite what you opened; never invent a URL. `references/evidence.md` lists checked sources for
      common changes (bcrypt cost, php-jwt key length...).
-   - Scanner rules already link their php.net page (and RFC where known); library upgrade notes in
-     `libs.json` (`upgrade_notes`) come with their own evidence: reuse those links in your notes.
+   - Every scanner rule in `scan.json` already carries `evidence` (the php-src `UPGRADING` entry, quoted, and
+     the RFCs it cites) next to its php.net `ref`; library `upgrade_notes` and `advisories` in `libs.json` come
+     with their own links. Reuse those links in your notes.
    - For a re-scan: compare with the previous version (the report shows resolved / new / unchanged), update
      the notes, and remove `carried_from` once reviewed.
 
@@ -170,9 +181,9 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
 |---|---|
 | `scripts/audit.php` | One scan of one repo into the history store (`--help` explains the whole flow) |
 | `scripts/detect.php` | Framework, PHP version hints, minified files, non-Composer libraries |
-| `scripts/scan_code.php` | Tokenizer scanner; rules in `scripts/rules.php` (+ `rules_en.php`) |
+| `scripts/scan_code.php` | Tokenizer scanner; rules in `scripts/rules.php` (+ `rules_en.php`, sources in `rules_evidence.php`) |
 | `scripts/lint.php` | `php -l` on every file with the target PHP |
-| `scripts/check_libs.php` | Composer libraries vs target, abandoned packages, Packagist suggestions, removed extensions |
+| `scripts/check_libs.php` | Composer libraries vs target, abandoned packages, security advisories, Packagist suggestions, removed extensions |
 | `scripts/load_classes.php` | Runtime proof: load every app (or vendor) class on the target PHP |
 | `scripts/run_tools.php` | PHPCompatibility + Rector dry-run |
 | `scripts/compare_framework.php` | Framework old vs new vs application |
@@ -183,6 +194,7 @@ With no arguments, ask which repo(s) to audit and to which PHP version, then con
 | `scripts/library_notes.php` | Breaking changes of popular packages, with upstream sources |
 | `scripts/update.sh` | Self-update (run first, see above) |
 | `scripts/render.php` | Store → one HTML report (`assets/report-template.html`) |
+| `scripts/sarif.php` | One scan → SARIF 2.1.0 for code scanning in CI (also `audit.php --sarif=<file>`) |
 
 Exit codes of every script: 0 ok, 1 wrong usage, 2 environment problem, 4 `render.php` refused to write a report
-that still contains a secret, 10 findings (`audit.php --fail-on`) or note errors (`validate_notes.php`). Adding or fixing rules: `references/rules.md`. Tests: `bash tests/run.sh`.
+that still contains a secret, 10 findings (`audit.php --fail-on`) or note errors (`validate_notes.php`). Adding or fixing rules: `references/rules.md`. Tests: `bash tests/run.sh`; agent evals: `evals/README.md`.

@@ -1,0 +1,31 @@
+schema_version: "1.0"
+name: specific-target
+description: A target the user names (8.3.36) is passed on, and later changes are not reported.
+tags: [audit, target]
+runs: 1
+execution:
+  max_turns: 80
+  timeout_seconds: 1800
+  allowed_tools: [Bash, Read, Write, Edit, Glob, Grep, Skill]
+  prompt: |
+    With the php-upgrade-audit skill, check the sample project shipped with the skill (fixtures/legacy-app)
+    for an upgrade to PHP 8.3.36 only; we are not going to 8.4 yet. Store everything in ./store and answer in
+    English.
+graders:
+  - type: regex
+    name: target-passed
+    target: trace
+    pattern: "audit\\.php [^\\n]*--target=8\\.3\\.36"
+  - type: regex
+    name: no-latest-target
+    target: trace
+    pattern: "audit\\.php [^\\n]*--target=(latest|8\\.[45])"
+    match: not_contains
+  - type: llm
+    name: no-later-changes
+    focus: last_message
+    criteria: |
+      The reply is about PHP 8.3.36. It does not present PHP 8.4 or 8.5 changes as findings for this upgrade:
+      no bcrypt cost change (8.4), no implicitly nullable parameter deprecation (8.4), no fputcsv escape
+      deprecation (8.4), no backtick or (integer) cast deprecation (8.5). Mentioning that they come later, as
+      a note for a future upgrade, is fine.

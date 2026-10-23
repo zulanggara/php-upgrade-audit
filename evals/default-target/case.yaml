@@ -1,0 +1,44 @@
+schema_version: "1.0"
+name: default-target
+description: With no target, the audit runs for the latest PHP and ends with a validated, rendered report.
+tags: [audit]
+runs: 1
+execution:
+  max_turns: 80
+  timeout_seconds: 1800
+  allowed_tools: [Bash, Read, Write, Edit, Glob, Grep, Skill]
+  prompt: |
+    Use the php-upgrade-audit skill to audit the sample project that ships with the skill (its
+    fixtures/legacy-app folder) before a PHP upgrade. Keep the audit store in ./store in the current folder
+    and write the report in English.
+graders:
+  - type: tool_used
+    name: skill-loaded
+    tool: Skill
+    min: 1
+    arm: with-only
+  - type: regex
+    name: ran-audit
+    target: trace
+    pattern: "scripts/audit\\.php"
+  - type: regex
+    name: no-older-target
+    target: trace
+    pattern: "audit\\.php [^\\n]*--target=(7\\.|8\\.[0-4])"
+    match: not_contains
+  - type: regex
+    name: validated-notes
+    target: trace
+    pattern: "validate_notes\\.php"
+  - type: file_exists
+    name: report-rendered
+    path: store/report.html
+  - type: llm
+    name: reply
+    focus: last_message
+    criteria: |
+      The final reply summarises the audit of legacy-app: it states the target PHP version (8.5.x, the
+      latest), names concrete blockers (for example the removed each()/create_function, the PHP 4 style
+      constructor, the curly brace offset parse error, or unsupported libraries such as guzzle 6 or
+      php-jwt 5), says which PHP the proof ran on, and says where the report is. It does not claim to have
+      changed the audited project.

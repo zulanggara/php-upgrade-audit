@@ -14,21 +14,26 @@ change the audited code.
 Inputs to settle first (ask the user when they did not say):
 
 - **Repo(s)** to audit.
-- **Target PHP version**: what the user asked for (e.g. `8.3.30`); otherwise `latest`, the newest version the
-  rules cover (8.5.12). Rules introduced after the target are not reported.
+- **Target PHP version**: what the user asked for (e.g. `8.3.30`); otherwise leave `--target` out: `latest`
+  is the newest PHP release of the newest minor the rules cover (asked from php.net, 8.5.12 offline); a bare
+  minor (`8.3`) means its newest release. Rules introduced after the target are not reported. Never choose a
+  target yourself or lower it to the installed PHP; a missing target PHP is solved with `--php`.
 - **Report language**: `en` or `id` (the language the user writes in).
 - **Store**: where the history lives; default `~/php-audit-store`, always outside the audited repos and not a
   temporary folder.
 
 ## Rules you must follow
 
-1. Never write into the audited repo. All output goes to the store (`--out` / `--store`) outside it.
+1. Never write into the audited repo, not even a test file. All output goes to the store (`--out` / `--store`)
+   outside it. Asked to fix the code too: say the audit is read-only and point to the suggested code.
 2. Never run `composer install/update` in the audited repo. `load_classes.php` installs in a scratch copy.
 3. Rector only with `--dry-run` (the scripts enforce this).
 4. No data leaves the machine except public package names sent to repo.packagist.org (private packages are
    skipped), and, with `--load-classes`, the downloads of a normal `composer install` in the scratch copy. Use
    `--offline` to disable both. Render with `--offline` for a page without web fonts. `scripts/update.sh`
-   checks GitHub once a day for a new version of this kit (`PHP_UPGRADE_AUDIT_NO_UPDATE=1` turns it off).
+   checks GitHub once a day for a new version of this kit (`PHP_UPGRADE_AUDIT_NO_UPDATE=1` turns it off). The
+   default target asks php.net for the newest PHP release, the library check asks packagist.org for security
+   advisories of public packages, and `--php=docker` pulls the official `php` image.
 8. Every claim in a note is checkable: link its sources in `evidence` (only sources you opened) and record the
    run of suggested code in `proof`.
 5. Never put secrets in notes or code samples. Tool output and the report are redacted automatically, but you
@@ -47,20 +52,22 @@ php -v                         # php -l and class loading prove behaviour on THI
 When `update.sh` prints `update: updated`, read this file again before continuing.
 
 If `php -v` is not the target version, find the target binary (`php8.3`, `/opt/homebrew/opt/php@8.3/bin/php`)
-and pass `--php=<binary>` to `audit.php`. If there is none, tell the user (package manager, Homebrew, or
-Docker `php:8.3-cli` can provide it) and continue only if they agree; the notes must then say which PHP ran
-the proof.
+and pass `--php=<binary>` to `audit.php`. Without one but with Docker, pass `--php=docker`: the runtime steps
+run in the official `php:<target>-cli` image (no network, repo read-only, removed afterwards). With neither,
+tell the user (package manager, Homebrew or Docker can provide it) and continue only if they agree; the notes
+must then say which PHP ran the proof.
 
 ## Steps
 
 1. **Scan** each repo (adds a version to the store):
-   `php <TOOL>/scripts/audit.php <repo> --out=<STORE> --name=<name> --target=<version> --load-classes [--php=<binary>] [--exclude=tests]`
+   `php <TOOL>/scripts/audit.php <repo> --out=<STORE> --name=<name> [--target=<version>] --load-classes [--php=<binary>|docker] [--exclude=tests] [--sarif=<file>]`
    (`php <TOOL>/scripts/audit.php --help` lists every option.)
 2. **Find the production PHP version** if the repo does not state it (Dockerfile, CI, base image;
    `profile.json` lists the hints found).
 3. **Review** `<STORE>/<name>/scans/<id>/`: `report.json` (all tools combined), `scan.json`, `lint.json`,
    `runtime.json`, `libs.json`, `phpcompat.json`, `rector.json`. Order: must-fix (`wajib`), lint errors and
-   classes that fail to load → libraries → deprecated → behaviour changes (`perilaku`). Read the code around
+   classes that fail to load → libraries and their security `advisories` → deprecated → behaviour changes
+   (`perilaku`). Read the code around
    low/medium confidence findings and drop false positives. `guard_state`: `mati` = does not run on the target,
    `jalan` = runs, `?` = check by hand. In `runtime.json`, `unresolved` (a parent not in the repo or not
    installed) is not a PHP problem by itself; `failed` is.
@@ -70,8 +77,9 @@ the proof.
 5. **Write notes** to `<STORE>/<name>/scans/<id>/notes.json` (format below). Every note that needs a code
    change has a Current/Suggested `code` pair that you have run on the target PHP (record it in `proof`), and
    every `wajib`/`deprecated`/`perilaku` note has `evidence`: php.net, RFC, php-src `UPGRADING`, the library's
-   `UPGRADE`/`CHANGELOG`/release notes at a tag, or the source line. Reuse the links of scanner rules and of
-   `libs.json` `upgrade_notes`; `references/evidence.md` lists checked sources for common changes.
+   `UPGRADE`/`CHANGELOG`/release notes at a tag, or the source line. Reuse the links of scanner rules (each rule
+   in `scan.json` has `evidence`: its php-src `UPGRADING` quote and RFCs) and of `libs.json` `upgrade_notes`
+   and `advisories`; `references/evidence.md` lists checked sources for common changes.
 6. **Write the overview** to `<STORE>/overview.json`.
 7. **Check** them: `php <TOOL>/scripts/validate_notes.php --store=<STORE>` and fix every error.
 8. **Render** the report:
@@ -122,7 +130,8 @@ results and remove `carried_from`.
 
 ## CI
 
-`audit.php --fail-on=wajib|deprecated|perilaku` exits 10 when there are findings at that level or above.
+`audit.php --fail-on=wajib|deprecated|perilaku` exits 10 when there are findings at that level or above;
+`--sarif=<file>` writes the findings as SARIF 2.1.0 for code scanning (`php scripts/sarif.php --help`).
 Exit codes of every script: 0 ok, 1 wrong usage, 2 environment problem, 4 render refused (a secret is still in
 the page data), 10 findings / note errors.
 
