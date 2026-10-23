@@ -1,0 +1,58 @@
+name: links
+
+# Every Monday: check that each cited source still exists and still says what is quoted.
+# Something broken opens (or updates) one issue labelled "broken-links".
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+
+      - name: Check sources
+        id: check
+        run: |
+          set +e
+          php tests/check_links.php --json="$RUNNER_TEMP/links.json" | tee "$RUNNER_TEMP/links.txt"
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Report broken sources
+        if: steps.check.outputs.code == '10'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "The weekly check found cited sources that no longer exist or no longer contain the quoted text."
+            echo "Fix the entry (new URL at a tag, or the new wording) in the file named after \"cited in\"."
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/links.txt"
+            echo '```'
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$RUNNER_TEMP/body.md"
+          gh label create broken-links --color d93f0b --description "A cited source moved or changed" 2>/dev/null || true
+          issue=$(gh issue list --label broken-links --state open --json number --jq '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh issue create --title "Cited sources need an update" --label broken-links --body-file "$RUNNER_TEMP/body.md"
+          fi
+          exit 1
+
+      - name: Other failure
+        if: steps.check.outputs.code != '0' && steps.check.outputs.code != '10'
+        run: exit 1
