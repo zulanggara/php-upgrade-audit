@@ -29,10 +29,17 @@ known vulnerabilities.
 - `release.yml`: a new version in `plugin.json` on `main` is tagged and released with its CHANGELOG section;
   a warning when the kit changes without a new version. Issue templates for wrong findings and bugs.
 
+- The profile records uncommitted changes of the audited repo (staged, unstaged, untracked), and its page
+  shows a badge when the scanned tree is not the commit.
+
 ### Changed
 
 - SKILL.md and AGENTS.md: never choose a target or lower it to the installed PHP (an eval run showed an agent
   doing that), and never write a test file into the audited repo.
+
+### Fixed
+
+- `update.sh` treated a git clone under a symlinked path (macOS `/var` -> `/private/var`) as a plain copy.
 
 ## 1.1.0 (2026-10-23)
 
