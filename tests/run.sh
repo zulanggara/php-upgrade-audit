@@ -15,6 +15,8 @@ for rule in P80-CURLY-OFFSET P80-REMOVED-FUNC P80-PHP4-CTOR P80-CONCAT-PRECEDENC
             P84-IMPLICIT-NULLABLE P84-CSV-ESCAPE P85-BACKTICK P85-CAST-NAME P85-CASE-SEMICOLON P85-FREE-FUNC EXT-MYSQL; do
   grep -q "\"rule\": \"$rule\"" "$TMP/scan.json" || fail "rule $rule did not fire"
 done
+# Regression: a value list in in_array() must not be reported as a relative callable (exactly the 2 real ones)
+[ "$(grep -c '"rule": "P82-RELATIVE-CALLABLE"' "$TMP/scan.json")" = "2" ] || fail "relative-callable false positive (in_array value list) or miss"
 echo "scanner: ok"
 
 # Every rule has an English title and fix

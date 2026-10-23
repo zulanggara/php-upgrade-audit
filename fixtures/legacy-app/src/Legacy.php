@@ -21,6 +21,7 @@ class Legacy
         if (substr($name, 10) === false) {}
         $cb = 'self::helper';
         $cb2 = ['parent', 'helper'];
+        $ok = in_array($type, ['static', 'dynamic']);
         trigger_error('x', E_USER_ERROR);
         return htmlspecialchars($s);
     }

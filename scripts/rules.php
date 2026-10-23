@@ -158,7 +158,7 @@ return [
         'title' => 'Interpolasi string "${var}" deprecated', 'fix' => 'Ganti ke "{$var}".', 'ref' => MIG . 'migration82.deprecated.php'],
     ['id' => 'P82-DYNAMIC-PROP', 'sev' => 'deprecated', 'ver' => '8.2', 'conf' => 'sedang', 'kind' => 'special', 'check' => 'dynamic_prop',
         'title' => 'Kemungkinan dynamic property (properti tidak dideklarasikan)', 'fix' => 'Deklarasikan properti di class, atau tambahkan #[\AllowDynamicProperties]. Temuan heuristik, cek manual.', 'ref' => MIG . 'migration82.deprecated.php'],
-    ['id' => 'P82-RELATIVE-CALLABLE', 'sev' => 'deprecated', 'ver' => '8.2', 'conf' => 'tinggi', 'kind' => 'special', 'check' => 'relative_callable',
+    ['id' => 'P82-RELATIVE-CALLABLE', 'sev' => 'deprecated', 'ver' => '8.2', 'conf' => 'sedang', 'kind' => 'special', 'check' => 'relative_callable',
         'title' => 'Callable relatif "self::method" / ["parent", "method"] deprecated', 'fix' => 'Pakai self::class . "::method", [self::class, "method"], atau first-class callable self::method(...).', 'ref' => MIG . 'migration82.deprecated.php'],
     ['id' => 'P82-MB-ENCODING', 'sev' => 'deprecated', 'ver' => '8.2', 'conf' => 'tinggi', 'kind' => 'func', 'names' => ['mb_convert_encoding', 'mb_check_encoding', 'mb_detect_encoding', 'mb_strlen', 'mb_substr', 'mb_convert_variables', 'mb_internal_encoding'],
         'arg_string' => ['index' => 'any', 'values' => ['HTML-ENTITIES', 'HTML', 'QPrint', 'Quoted-Printable', 'BASE64', 'UUENCODE']],

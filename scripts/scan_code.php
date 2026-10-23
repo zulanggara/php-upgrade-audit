@@ -764,9 +764,31 @@ final class Scanner
             && ($this->id($i - 1) === '[' || ($this->id($i - 1) === '(' && $this->id($i - 2) === T_ARRAY))
             && $this->id($i + 1) === ','
             && $this->id($i + 2) === T_CONSTANT_ENCAPSED_STRING
-            && in_array($this->id($i + 3), [']', ')'], true)) {
+            && in_array($this->id($i + 3), [']', ')'], true)
+            && !$this->isValueListArgument($this->id($i - 1) === '[' ? $i - 1 : $i - 2)) {
             $this->special('relative_callable', $line);
         }
+    }
+
+    /** True when the array literal opening at $open is the haystack/needle list of in_array(), array_search() or array_keys(), not a callable. */
+    private function isValueListArgument(int $open): bool
+    {
+        if ($this->id($open - 1) !== ',') {
+            return false;
+        }
+        $depth = 0;
+        for ($k = $open - 1; $k >= 0; $k--) {
+            $id = $this->id($k);
+            if (self::isClose($id)) {
+                $depth++;
+            } elseif (self::isOpen($id)) {
+                if ($depth === 0) {
+                    return $id === '(' && in_array($this->bareName($k - 1), ['in_array', 'array_search', 'array_keys', 'array_diff', 'array_intersect'], true);
+                }
+                $depth--;
+            }
+        }
+        return false;
     }
 
     private function checkCase(int $i): void
