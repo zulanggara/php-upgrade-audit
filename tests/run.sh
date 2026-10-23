@@ -105,6 +105,12 @@ php -r '$f = array_filter(json_decode(file_get_contents($argv[1]), true)["findin
 exit(array_column($f, "line") === [3] ? 0 : 1);' "$TMP/ini.json" || fail "removed INI: only ini_set() must be reported"
 echo "scanner heuristics: ok"
 
+# Null passed to scalar parameters of built-ins (8.1): exactly the lines marked "// FIND" in fixtures/null-args,
+# none of the lines marked "// ok", and every finding carries its detail
+php "$DIR/scripts/scan_code.php" "$DIR/fixtures/null-args" > "$TMP/null.json"
+php "$DIR/tests/check_null_args.php" "$DIR/fixtures/null-args" "$TMP/null.json" || fail "P81-NULL-TO-INTERNAL does not match the // FIND markers"
+echo "null arguments: ok"
+
 # Lint must report the curly-offset parse error
 php "$DIR/scripts/lint.php" "$DIR/fixtures/legacy-app" > "$TMP/lint.json"
 grep -q '"Parse error"' "$TMP/lint.json" || fail "lint did not report the parse error"
