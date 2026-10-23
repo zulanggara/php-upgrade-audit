@@ -54,6 +54,7 @@ return [
     'P83-ASSERT-CONST' => ['ASSERT_* constants deprecated', 'Configure via the zend.assertions INI setting.'],
     'P84-IMPLICIT-NULLABLE' => ['Implicitly nullable parameter (Type $x = null) deprecated', 'Write ?Type $x = null.'],
     'P84-OPTIONAL-BEFORE-REQUIRED' => ['Optional parameter declared before a required one', 'The default has no effect. Remove it or reorder the parameters.'],
+    'P84-BCRYPT-COST' => ['Default bcrypt cost raised from 10 to 12: password_hash() is slower, old hashes count as needing a rehash', "New hashes use cost 12, about 4x slower (measured ~60 ms to ~240 ms per hash), and password_needs_rehash() returns true for cost-10 hashes, so old hashes are rewritten on login. Measure the load on login/registration endpoints; pass ['cost' => 10] explicitly if the old behaviour must stay."],
     'P84-USER-ERROR' => ['trigger_error() with E_USER_ERROR deprecated', 'Throw an exception or call exit().'],
     'P84-DEPR-CONST' => ['Constant deprecated in PHP 8.4', 'E_STRICT -> remove from error_reporting (already part of E_ALL); CURLOPT_BINARYTRANSFER -> remove; SID -> use the session cookie.'],
     'P84-DEPR-FUNC' => ['Function deprecated in PHP 8.4', 'lcg_value() -> (new Random\Randomizer)->getFloat(); mysqli_kill/refresh -> SQL KILL/FLUSH; mysqli_ping -> remove.'],

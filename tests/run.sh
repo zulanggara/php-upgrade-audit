@@ -12,11 +12,13 @@ php "$DIR/tests/redact_test.php"
 # Scanner: every listed rule must fire on the fixture
 php "$DIR/scripts/scan_code.php" "$DIR/fixtures/legacy-app" > "$TMP/scan.json"
 for rule in P80-CURLY-OFFSET P80-REMOVED-FUNC P80-PHP4-CTOR P80-CONCAT-PRECEDENCE P82-DOLLAR-BRACE P82-DYNAMIC-PROP \
-            P84-IMPLICIT-NULLABLE P84-CSV-ESCAPE P85-BACKTICK P85-CAST-NAME P85-CASE-SEMICOLON P85-FREE-FUNC EXT-MYSQL; do
+            P84-IMPLICIT-NULLABLE P84-CSV-ESCAPE P84-BCRYPT-COST P85-BACKTICK P85-CAST-NAME P85-CASE-SEMICOLON P85-FREE-FUNC EXT-MYSQL; do
   grep -q "\"rule\": \"$rule\"" "$TMP/scan.json" || fail "rule $rule did not fire"
 done
 # Regression: a value list in in_array() must not be reported as a relative callable (exactly the 2 real ones)
 [ "$(grep -c '"rule": "P82-RELATIVE-CALLABLE"' "$TMP/scan.json")" = "2" ] || fail "relative-callable false positive (in_array value list) or miss"
+[ "$(grep -c '"rule": "P84-BCRYPT-COST"' "$TMP/scan.json")" = "1" ] || fail "P84-BCRYPT-COST must fire once (not when the cost is explicit)"
+grep -q '"url": "https://wiki.php.net/rfc/bcrypt_cost_2023"' "$TMP/scan.json" || fail "rule evidence is not in scan.json"
 echo "scanner: ok"
 
 # Every rule has an English title and fix
@@ -33,7 +35,7 @@ echo "translations: ok"
 # Scanner with an older target: rules introduced after the target must not be reported
 php "$DIR/scripts/scan_code.php" "$DIR/fixtures/legacy-app" --target=8.3.30 > "$TMP/scan83.json"
 grep -q '"rule": "P80-' "$TMP/scan83.json" || fail "target 8.3: PHP 8.0 rules no longer fire"
-for rule in P84-IMPLICIT-NULLABLE P84-CSV-ESCAPE P85-BACKTICK P85-CAST-NAME P85-CASE-SEMICOLON P85-FREE-FUNC; do
+for rule in P84-IMPLICIT-NULLABLE P84-CSV-ESCAPE P84-BCRYPT-COST P85-BACKTICK P85-CAST-NAME P85-CASE-SEMICOLON P85-FREE-FUNC; do
   grep -q "\"rule\": \"$rule\"" "$TMP/scan83.json" && fail "target 8.3: $rule (introduced after 8.3) was reported"
 done
 echo "scanner target: ok"
@@ -175,7 +177,7 @@ if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
   [ -d "$DIR/tests/node_modules/jsdom" ] || (cd "$DIR/tests" && npm install --silent --no-audit --no-fund >/dev/null 2>&1) || true
   if [ -d "$DIR/tests/node_modules/jsdom" ]; then
     for lang in en id; do
-      node "$DIR/tests/page_check.js" "$TMP/report-$lang.html" || fail "a report page failed to render ($lang)"
+      node "$DIR/tests/page_check.js" "$TMP/report-$lang.html" --expect-link=https://wiki.php.net/rfc/bcrypt_cost_2023 || fail "a report page failed to render ($lang)"
     done
   else
     echo "pages: skipped (could not install jsdom; run 'npm install' in tests/)"

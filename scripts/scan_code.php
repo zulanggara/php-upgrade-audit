@@ -50,7 +50,7 @@ foreach ($files as $path) {
 
 $meta = [];
 foreach ($rules as $r) {
-    $meta[$r['id']] = array_intersect_key($r, array_flip(['sev', 'ver', 'conf', 'title', 'fix', 'ref', 'rector']));
+    $meta[$r['id']] = array_intersect_key($r, array_flip(['sev', 'ver', 'conf', 'title', 'fix', 'ref', 'rector', 'evidence']));
 }
 printJson([
     'tool' => 'scan_code',

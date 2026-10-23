@@ -70,3 +70,5 @@ ini_set('track_errors', 1);
 $f = (real) $n;
 echo get_class();
 if (is_resource($ch)) {}
+$hash = password_hash($n, PASSWORD_DEFAULT);
+$kept = password_hash($n, PASSWORD_BCRYPT, ['cost' => 10]);
