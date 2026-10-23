@@ -17,7 +17,7 @@
 # Network: one `git fetch` from origin, or one HTTPS request for the published plugin.json.
 set -uo pipefail
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 PUBLISHED_JSON="${PHP_UPGRADE_AUDIT_UPDATE_URL:-https://raw.githubusercontent.com/zulanggara/php-upgrade-audit/HEAD/.claude-plugin/plugin.json}"
 FORCE=0; CHECK=0
 for a in "$@"; do
